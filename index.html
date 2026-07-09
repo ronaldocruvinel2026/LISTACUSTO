@@ -613,6 +613,22 @@ let nextId = DATA.length;
 let state={q:'',cat:'ALL',fab:'ALL',sort:'ia',view:'grid'};
 let mState={q:'',cat:'ALL',sel:new Set()};
 
+/* ========== PROTEÇÃO POR SENHA (edição) ========== */
+const SENHA_EDICAO='setec2026';
+let editUnlocked=false;
+function pedirSenha(){
+  if(editUnlocked) return true;
+  const s=prompt('Digite a senha para editar (importar, alterar preços, excluir):');
+  if(s===null) return false; // cancelou
+  if(s===SENHA_EDICAO){
+    editUnlocked=true;
+    return true;
+  }
+  alert('Senha incorreta.');
+  return false;
+}
+
+
 /* ========== CAMADA SUPABASE (sincronização online) ========== */
 const SUPABASE_URL='https://kahdclboqzyrugxwfvkl.supabase.co';
 const SUPABASE_KEY='sb_publishable_qkQsCL8qJdoX-0-cJIzuew_3pltLueR';
@@ -748,6 +764,7 @@ function mFiltered(){
   });
 }
 function savePrice(id, raw){
+  if(!editUnlocked){ if(!pedirSenha()){ renderManage(); return; } }
   const p=DATA.find(x=>x._id===id);
   if(!p) return;
   const s=(raw||'').toString().trim();
@@ -813,6 +830,7 @@ function askDelete(ids){
   document.getElementById('modalBg').classList.add('on');
 }
 function doDelete(){
+  if(!editUnlocked){ if(!pedirSenha()){ document.getElementById('modalBg').classList.remove('on'); return; } }
   const ids=pendingDelete.slice();
   const set=new Set(ids);
   DATA=DATA.filter(p=>!set.has(p._id));
@@ -891,6 +909,7 @@ function setImportStatus(cls,msg){
 }
 function handleFile(file){
   if(!file)return;
+  if(!editUnlocked){ if(!pedirSenha()) return; }
   setImportStatus('','');
   if(typeof XLSX==='undefined'||!XLSX.read){
     setImportStatus('err','Leitor de planilha indisponível. Se estiver offline, tente novamente conectado à internet uma vez.');
@@ -971,7 +990,7 @@ function showTab(t){
   if(!list)renderManage();
 }
 document.getElementById('tabList').onclick=()=>showTab('list');
-document.getElementById('tabImport').onclick=()=>showTab('import');
+document.getElementById('tabImport').onclick=()=>{ if(pedirSenha()) showTab('import'); };
 
 document.getElementById('q').oninput=e=>{state.q=e.target.value;render();};
 document.getElementById('fabSel').onchange=e=>{state.fab=e.target.value;render();};
