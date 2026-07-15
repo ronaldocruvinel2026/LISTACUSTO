@@ -906,6 +906,25 @@ function normalizaVenc(v){
   if(m){ return '30/'+String(m[1]).padStart(2,'0')+'/'+m[2]; }
   return s;
 }
+function parsePreco(v){
+  if(v==null||v==='') return null;
+  // se já é número (Excel numérico), usa direto
+  if(typeof v==='number'){ return (!isNaN(v)&&v>0)?v:null; }
+  let s=String(v).replace(/[^0-9.,]/g,''); // tira R$, espaços etc
+  if(s==='') return null;
+  const temVirgula=s.indexOf(',')>-1;
+  const temPonto=s.indexOf('.')>-1;
+  if(temVirgula && temPonto){
+    // formato brasileiro: ponto = milhar, vírgula = decimal (1.234,56)
+    s=s.replace(/\./g,'').replace(',','.');
+  }else if(temVirgula){
+    // só vírgula = decimal brasileiro (18,42)
+    s=s.replace(',','.');
+  }
+  // só ponto (18.42) ou sem separador (64) -> ponto já é decimal, não mexe
+  const n=parseFloat(s);
+  return (!isNaN(n)&&n>0)?n:null;
+}
 function parseSheetRows(rows,catForcada){
   if(!rows||!rows.length)return [];
   const headers=rows[0].map(x=>x==null?'':String(x));
@@ -927,8 +946,7 @@ function parseSheetRows(rows,catForcada){
     const venc = iVenc>=0 ? normalizaVenc(row[iVenc]) : '';
     let preco=null;
     if(iPreco>=0&&row[iPreco]!=null&&row[iPreco]!==''){
-      const vRaw=parseFloat(String(row[iPreco]).replace(/[^0-9.,]/g,'').replace(/\./g,'').replace(',','.'));
-      if(!isNaN(vRaw)&&vRaw>0)preco=vRaw;
+      preco=parsePreco(row[iPreco]);
     }
     out.push({cat,fab,prod,ia,venc,preco});
   }
