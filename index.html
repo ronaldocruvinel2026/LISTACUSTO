@@ -144,6 +144,11 @@ table.mtable tbody tr.sel:hover{background:#f7d9d0}
 .price-edit{width:100px;text-align:right;font-weight:700;color:var(--leaf-dark);font-size:13.5px;padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;background:#fff;outline:none;font-family:inherit}
 .price-edit:focus{border-color:var(--leaf);background:var(--leaf-soft)}
 .price-edit::placeholder{color:var(--muted);font-weight:400}
+.venc-edit{width:110px;text-align:center;font-weight:600;color:var(--ink);font-size:12.5px;padding:6px 6px;border:1.5px solid var(--line);border-radius:8px;background:#fff;outline:none;font-family:inherit}
+.venc-edit:focus{border-color:var(--leaf);background:var(--leaf-soft)}
+.venc-edit::placeholder{color:var(--muted);font-weight:400;font-size:11.5px}
+.cat-edit{width:130px;font-weight:600;color:var(--ink);font-size:12.5px;padding:6px 6px;border:1.5px solid var(--line);border-radius:8px;background:#fff;outline:none;font-family:inherit;cursor:pointer}
+.cat-edit:focus{border-color:var(--leaf)}
 
 .footer-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;align-items:center}
 .hint{font-size:12.5px;color:var(--muted)}
@@ -554,6 +559,7 @@ global.XLSX=XLSX;
           <option value="ALL">Todas categorias</option>
           <option value="DEFENSIVOS">Defensivos</option>
           <option value="ESPECIALIDADES">Especialidades</option>
+          <option value="SEMENTE">Sementes</option>
         </select>
         <span class="sel-badge" id="selBadge">0 selecionados</span>
         <button class="btn danger" id="delSelBtn" disabled>Excluir selecionados</button>
@@ -563,7 +569,7 @@ global.XLSX=XLSX;
           <thead><tr>
             <th class="chkcell"><input type="checkbox" class="chk" id="chkAll" title="Selecionar todos"></th>
             <th>Fabricante</th><th>Produto</th><th class="hide-sm">Princípio Ativo</th>
-            <th class="hide-sm">Cat.</th><th style="text-align:right">Preço (editável)</th><th></th>
+            <th>Grupo</th><th>Vencimento</th><th style="text-align:right">Preço (editável)</th><th></th>
           </tr></thead>
           <tbody id="mBody"></tbody>
         </table>
@@ -781,19 +787,47 @@ function savePrice(id, raw){
   buildStats();buildFilters();render();renderManage();
   sbUpdatePreco(id, p.preco);
 }
+function saveVenc(id, raw){
+  if(!editUnlocked){ if(!pedirSenha()){ renderManage(); return; } }
+  const p=DATA.find(x=>x._id===id);
+  if(!p) return;
+  const s=(raw||'').toString().trim();
+  p.venc = s==='' ? '' : normalizaVenc(s);
+  buildStats();buildFilters();render();renderManage();
+  sbUpdateCampos(id, {vencimento: p.venc||null});
+}
+function saveCat(id, novaCat){
+  if(!editUnlocked){ if(!pedirSenha()){ renderManage(); return; } }
+  const p=DATA.find(x=>x._id===id);
+  if(!p) return;
+  p.cat=novaCat;
+  buildStats();buildFilters();render();renderManage();
+  sbUpdateCampos(id, {cat: novaCat});
+}
+async function sbUpdateCampos(id, campos){
+  if(!sbReady) return;
+  try{ await sb.from('produtos').update(campos).eq('id',id); }
+  catch(e){ if(window.console)console.warn('Erro ao salvar:',e); }
+}
 function renderManage(){
   const r=mFiltered();
   const body=document.getElementById('mBody');
-  if(!r.length){body.innerHTML='<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">Nenhum produto.</td></tr>';}
+  if(!r.length){body.innerHTML='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted)">Nenhum produto.</td></tr>';}
   else{
     body.innerHTML=r.map(p=>{
       const sel=mState.sel.has(p._id);
+      const catAtual=p.cat||'DEFENSIVOS';
       return '<tr class="'+(sel?'sel':'')+'" data-id="'+p._id+'">'+
         '<td class="chkcell"><input type="checkbox" class="chk rowchk" data-id="'+p._id+'" '+(sel?'checked':'')+'></td>'+
         '<td class="m-fab">'+esc(p.fab||'—')+'</td>'+
         '<td class="t-name">'+esc(p.prod||'—')+'</td>'+
         '<td class="t-ia hide-sm">'+esc(p.ia||'—')+'</td>'+
-        '<td class="hide-sm" style="font-size:11px;color:var(--muted)">'+(p.cat==='DEFENSIVOS'?'DEF':'ESP')+'</td>'+
+        '<td class="m-cat"><select class="cat-edit" data-id="'+p._id+'">'+
+          '<option value="DEFENSIVOS"'+(catAtual==='DEFENSIVOS'?' selected':'')+'>Defensivo</option>'+
+          '<option value="ESPECIALIDADES"'+(catAtual==='ESPECIALIDADES'?' selected':'')+'>Especialidade</option>'+
+          '<option value="SEMENTE"'+(catAtual==='SEMENTE'?' selected':'')+'>Semente</option>'+
+        '</select></td>'+
+        '<td class="m-venc"><input class="venc-edit" type="text" inputmode="numeric" data-id="'+p._id+'" value="'+esc(p.venc||'')+'" placeholder="dd/mm/aaaa"></td>'+
         '<td class="m-price"><input class="price-edit" type="text" inputmode="decimal" data-id="'+p._id+'" value="'+(hasPrice(p)?fmtBRL(p.preco):'')+'" placeholder="—"></td>'+
         '<td style="text-align:center"><button class="row-del" data-id="'+p._id+'" title="Excluir">✕</button></td></tr>';
     }).join('');
@@ -806,6 +840,13 @@ function renderManage(){
     body.querySelectorAll('.price-edit').forEach(inp=>{
       inp.onchange=()=>savePrice(+inp.dataset.id, inp.value);
       inp.onkeydown=e=>{ if(e.key==='Enter'){ inp.blur(); } };
+    });
+    body.querySelectorAll('.venc-edit').forEach(inp=>{
+      inp.onchange=()=>saveVenc(+inp.dataset.id, inp.value);
+      inp.onkeydown=e=>{ if(e.key==='Enter'){ inp.blur(); } };
+    });
+    body.querySelectorAll('.cat-edit').forEach(sel=>{
+      sel.onchange=()=>saveCat(+sel.dataset.id, sel.value);
     });
     body.querySelectorAll('.row-del').forEach(b=>b.onclick=()=>askDelete([+b.dataset.id]));
   }
