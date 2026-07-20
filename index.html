@@ -149,6 +149,11 @@ table.mtable tbody tr.sel:hover{background:#f7d9d0}
 .venc-edit::placeholder{color:var(--muted);font-weight:400;font-size:11.5px}
 .cat-edit{width:130px;font-weight:600;color:var(--ink);font-size:12.5px;padding:6px 6px;border:1.5px solid var(--line);border-radius:8px;background:#fff;outline:none;font-family:inherit;cursor:pointer}
 .cat-edit:focus{border-color:var(--leaf)}
+.vis-btn{background:var(--leaf-soft);border:1.5px solid transparent;border-radius:8px;padding:5px 9px;font-size:15px;cursor:pointer;line-height:1;transition:all .15s}
+.vis-btn:hover{border-color:var(--leaf)}
+.vis-btn.off{background:#fbe6e0;opacity:.85}
+tr.oculto-row{opacity:.55}
+tr.oculto-row .t-name{text-decoration:line-through}
 
 .footer-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;align-items:center}
 .hint{font-size:12.5px;color:var(--muted)}
@@ -569,7 +574,7 @@ global.XLSX=XLSX;
           <thead><tr>
             <th class="chkcell"><input type="checkbox" class="chk" id="chkAll" title="Selecionar todos"></th>
             <th>Fabricante</th><th>Produto</th><th class="hide-sm">Princípio Ativo</th>
-            <th>Grupo</th><th>Vencimento</th><th style="text-align:right">Preço (editável)</th><th></th>
+            <th>Grupo</th><th>Vencimento</th><th style="text-align:right">Preço (editável)</th><th title="Visível na lista de preços de venda">Venda</th><th></th>
           </tr></thead>
           <tbody id="mBody"></tbody>
         </table>
@@ -680,7 +685,7 @@ async function carregarDoBanco(){
       const rr=await sb.from('produtos').select('*').order('id',{ascending:true});
       data=rr.data;
     }
-    DATA=data.map(row=>({_id:row.id, cat:row.cat, fab:row.fab, prod:row.prod, ia:row.ia||'', preco:row.preco, venc:row.vencimento||''}));
+    DATA=data.map(row=>({_id:row.id, cat:row.cat, fab:row.fab, prod:row.prod, ia:row.ia||'', preco:row.preco, venc:row.vencimento||'', oculto:!!row.oculto}));
     nextId=Math.max.apply(null,DATA.map(p=>p._id).concat([0]))+1;
     showSync('ok','✓ Sincronizado com a nuvem — '+DATA.length+' produtos.');
     return true;
@@ -799,6 +804,14 @@ function saveVenc(id, raw){
   buildStats();buildFilters();render();renderManage();
   sbUpdateCampos(id, {vencimento: p.venc||null});
 }
+function toggleOculto(id){
+  if(!editUnlocked){ if(!pedirSenha()){ renderManage(); return; } }
+  const p=DATA.find(x=>x._id===id);
+  if(!p) return;
+  p.oculto=!p.oculto;
+  renderManage();
+  sbUpdateCampos(id, {oculto: p.oculto});
+}
 function saveCat(id, novaCat){
   if(!editUnlocked){ if(!pedirSenha()){ renderManage(); return; } }
   const p=DATA.find(x=>x._id===id);
@@ -818,12 +831,12 @@ async function sbUpdateCampos(id, campos){
 function renderManage(){
   const r=mFiltered();
   const body=document.getElementById('mBody');
-  if(!r.length){body.innerHTML='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted)">Nenhum produto.</td></tr>';}
+  if(!r.length){body.innerHTML='<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--muted)">Nenhum produto.</td></tr>';}
   else{
     body.innerHTML=r.map(p=>{
       const sel=mState.sel.has(p._id);
       const catAtual=p.cat||'DEFENSIVOS';
-      return '<tr class="'+(sel?'sel':'')+'" data-id="'+p._id+'">'+
+      return '<tr class="'+(sel?'sel':'')+(p.oculto?' oculto-row':'')+'" data-id="'+p._id+'">'+
         '<td class="chkcell"><input type="checkbox" class="chk rowchk" data-id="'+p._id+'" '+(sel?'checked':'')+'></td>'+
         '<td class="m-fab">'+esc(p.fab||'—')+'</td>'+
         '<td class="t-name">'+esc(p.prod||'—')+'</td>'+
@@ -835,6 +848,7 @@ function renderManage(){
         '</select></td>'+
         '<td class="m-venc"><input class="venc-edit" type="text" inputmode="numeric" data-id="'+p._id+'" value="'+esc(p.venc||'')+'" placeholder="dd/mm/aaaa"></td>'+
         '<td class="m-price"><input class="price-edit" type="text" inputmode="decimal" data-id="'+p._id+'" value="'+(hasPrice(p)?fmtBRL(p.preco):'')+'" placeholder="—"></td>'+
+        '<td style="text-align:center"><button class="vis-btn'+(p.oculto?' off':'')+'" data-vis="'+p._id+'" title="'+(p.oculto?'Oculto na lista de preços — clique para exibir':'Visível na lista de preços — clique para ocultar')+'">'+(p.oculto?'🚫':'👁')+'</button></td>'+
         '<td style="text-align:center"><button class="row-del" data-id="'+p._id+'" title="Excluir">✕</button></td></tr>';
     }).join('');
     body.querySelectorAll('.rowchk').forEach(cb=>cb.onchange=()=>{
@@ -853,6 +867,9 @@ function renderManage(){
     });
     body.querySelectorAll('.cat-edit').forEach(sel=>{
       sel.onchange=()=>saveCat(+sel.dataset.id, sel.value);
+    });
+    body.querySelectorAll('[data-vis]').forEach(b=>{
+      b.onclick=()=>toggleOculto(+b.dataset.vis);
     });
     body.querySelectorAll('.row-del').forEach(b=>b.onclick=()=>askDelete([+b.dataset.id]));
   }
