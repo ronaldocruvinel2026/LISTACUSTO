@@ -538,16 +538,16 @@ global.XLSX=XLSX;
       </div>
       <div class="import-status" id="importStatus"></div>
       <div class="import-note">
-        <b>Formato da planilha (.xlsx):</b> a primeira linha deve conter os títulos das colunas, na ordem: <b>FABRICANTE</b>, <b>PRODUTO</b>, <b>PRINCIPIO ATIVO (I.A)</b>, <b>GRUPO</b>, <b>VENCIMENTO</b> e <b>PREÇO</b>. O <b>GRUPO</b> vai na própria linha (SEMENTE, DEFENSIVO ou ESPECIALIDADE). O <b>VENCIMENTO</b> em data completa (ex.: 30/04/2027). A coluna Princípio Ativo é opcional. Preços em branco ou zerados entram como "sem preço". Produtos novos são adicionados; produtos com fabricante + nome já existentes têm <b>preço, grupo e vencimento atualizados</b> automaticamente. Pode usar uma única aba com todos os produtos.
+        <b>Formato da planilha (.xlsx):</b> a primeira linha deve conter os títulos das colunas, na ordem: <b>FABRICANTE</b>, <b>PRODUTO</b>, <b>PRINCIPIO ATIVO (I.A)</b>, <b>GRUPO</b>, <b>VENCIMENTO</b>, <b>UNIDADE</b> e <b>PREÇO</b>. O <b>GRUPO</b> vai na própria linha (SEMENTE, DEFENSIVO ou ESPECIALIDADE). O <b>VENCIMENTO</b> em data completa (ex.: 30/04/2027). A coluna Princípio Ativo é opcional. Preços em branco ou zerados entram como "sem preço". Produtos novos são adicionados; produtos com fabricante + nome já existentes têm <b>preço, grupo e vencimento atualizados</b> automaticamente. Pode usar uma única aba com todos os produtos.
       </div>
       <div class="example-wrap">
         <div class="example-label">Exemplo de como a planilha deve estar:</div>
         <table class="example-tbl">
-          <thead><tr><th>FABRICANTE</th><th>PRODUTO</th><th>PRINCIPIO ATIVO (I.A)</th><th>GRUPO</th><th>VENCIMENTO</th><th>PREÇO</th></tr></thead>
+          <thead><tr><th>FABRICANTE</th><th>PRODUTO</th><th>PRINCIPIO ATIVO (I.A)</th><th>GRUPO</th><th>VENCIMENTO</th><th>UNIDADE</th><th>PREÇO</th></tr></thead>
           <tbody>
-            <tr><td>ALBAUGH</td><td>EXEMPLO</td><td>2,4 D</td><td>DEFENSIVO</td><td>30/04/2027</td><td>18,42</td></tr>
-            <tr><td>NORTOX</td><td>ABAMECTIN 72 EC</td><td>Abamectina 72</td><td>DEFENSIVO</td><td>01/05/2027</td><td>64,00</td></tr>
-            <tr><td>AGRICHEM</td><td>MAXI ZINC 10LT</td><td>1000 g/L Zn</td><td>ESPECIALIDADE</td><td>30/04/2027</td><td>75,46</td></tr>
+            <tr><td>ALBAUGH</td><td>EXEMPLO</td><td>2,4 D</td><td>DEFENSIVO</td><td>30/04/2027</td><td>LT</td><td>18,42</td></tr>
+            <tr><td>NORTOX</td><td>ABAMECTIN 72 EC</td><td>Abamectina 72</td><td>DEFENSIVO</td><td>01/05/2027</td><td>KG</td><td>64,00</td></tr>
+            <tr><td>AGRICHEM</td><td>MAXI ZINC 10LT</td><td>1000 g/L Zn</td><td>ESPECIALIDADE</td><td>30/04/2027</td><td>BAG</td><td>75,46</td></tr>
           </tbody>
         </table>
       </div>
@@ -574,7 +574,7 @@ global.XLSX=XLSX;
           <thead><tr>
             <th class="chkcell"><input type="checkbox" class="chk" id="chkAll" title="Selecionar todos"></th>
             <th>Fabricante</th><th>Produto</th><th class="hide-sm">Princípio Ativo</th>
-            <th>Grupo</th><th>Vencimento</th><th style="text-align:right">Preço (editável)</th><th title="Visível na lista de preços de venda">Venda</th><th></th>
+            <th>Grupo</th><th>Vencimento</th><th>Unid.</th><th style="text-align:right">Preço (editável)</th><th title="Visível na lista de preços de venda">Venda</th><th></th>
           </tr></thead>
           <tbody id="mBody"></tbody>
         </table>
@@ -685,7 +685,7 @@ async function carregarDoBanco(){
       const rr=await sb.from('produtos').select('*').order('id',{ascending:true});
       data=rr.data;
     }
-    DATA=data.map(row=>({_id:row.id, cat:row.cat, fab:row.fab, prod:row.prod, ia:row.ia||'', preco:row.preco, venc:row.vencimento||'', oculto:!!row.oculto}));
+    DATA=data.map(row=>({_id:row.id, cat:row.cat, fab:row.fab, prod:row.prod, ia:row.ia||'', preco:row.preco, venc:row.vencimento||'', unid:row.unidade||'LT', oculto:!!row.oculto}));
     nextId=Math.max.apply(null,DATA.map(p=>p._id).concat([0]))+1;
     showSync('ok','✓ Sincronizado com a nuvem — '+DATA.length+' produtos.');
     return true;
@@ -812,6 +812,14 @@ function toggleOculto(id){
   renderManage();
   sbUpdateCampos(id, {oculto: p.oculto});
 }
+function saveUnid(id, novaUnid){
+  if(!editUnlocked){ if(!pedirSenha()){ renderManage(); return; } }
+  const p=DATA.find(x=>x._id===id);
+  if(!p) return;
+  p.unid=novaUnid;
+  renderManage();
+  sbUpdateCampos(id, {unidade: novaUnid});
+}
 function saveCat(id, novaCat){
   if(!editUnlocked){ if(!pedirSenha()){ renderManage(); return; } }
   const p=DATA.find(x=>x._id===id);
@@ -831,7 +839,7 @@ async function sbUpdateCampos(id, campos){
 function renderManage(){
   const r=mFiltered();
   const body=document.getElementById('mBody');
-  if(!r.length){body.innerHTML='<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--muted)">Nenhum produto.</td></tr>';}
+  if(!r.length){body.innerHTML='<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--muted)">Nenhum produto.</td></tr>';}
   else{
     body.innerHTML=r.map(p=>{
       const sel=mState.sel.has(p._id);
@@ -847,6 +855,9 @@ function renderManage(){
           '<option value="SEMENTE"'+(catAtual==='SEMENTE'?' selected':'')+'>Semente</option>'+
         '</select></td>'+
         '<td class="m-venc"><input class="venc-edit" type="text" inputmode="numeric" data-id="'+p._id+'" value="'+esc(p.venc||'')+'" placeholder="dd/mm/aaaa"></td>'+
+        '<td class="m-unid"><select class="unid-edit" data-id="'+p._id+'">'+
+          ['LT','KG','BLS','BAG','SC','CT','UN'].map(u=>'<option value="'+u+'"'+((p.unid||'LT')===u?' selected':'')+'>'+u+'</option>').join('')+
+        '</select></td>'+
         '<td class="m-price"><input class="price-edit" type="text" inputmode="decimal" data-id="'+p._id+'" value="'+(hasPrice(p)?fmtBRL(p.preco):'')+'" placeholder="—"></td>'+
         '<td style="text-align:center"><button class="vis-btn'+(p.oculto?' off':'')+'" data-vis="'+p._id+'" title="'+(p.oculto?'Oculto na lista de preços — clique para exibir':'Visível na lista de preços — clique para ocultar')+'">'+(p.oculto?'🚫':'👁')+'</button></td>'+
         '<td style="text-align:center"><button class="row-del" data-id="'+p._id+'" title="Excluir">✕</button></td></tr>';
@@ -864,6 +875,9 @@ function renderManage(){
     body.querySelectorAll('.venc-edit').forEach(inp=>{
       inp.onchange=()=>saveVenc(+inp.dataset.id, inp.value);
       inp.onkeydown=e=>{ if(e.key==='Enter'){ inp.blur(); } };
+    });
+    body.querySelectorAll('.unid-edit').forEach(sel=>{
+      sel.onchange=()=>saveUnid(+sel.dataset.id, sel.value);
     });
     body.querySelectorAll('.cat-edit').forEach(sel=>{
       sel.onchange=()=>saveCat(+sel.dataset.id, sel.value);
@@ -1007,6 +1021,18 @@ function parsePreco(v){
   const n=parseFloat(s);
   return (!isNaN(n)&&n>0)?n:null;
 }
+function normalizaUnid(txt){
+  const u=norm(txt||'').replace(/[.\s]/g,'');
+  if(!u) return '';
+  if(u.startsWith('lt')||u.startsWith('lit')||u==='l') return 'LT';
+  if(u.startsWith('kg')||u.startsWith('quil')||u.startsWith('kil')) return 'KG';
+  if(u.startsWith('bls')||u.startsWith('bols')) return 'BLS';
+  if(u.startsWith('bag')) return 'BAG';
+  if(u.startsWith('sc')||u.startsWith('sac')) return 'SC';
+  if(u.startsWith('ct')||u.startsWith('cont')) return 'CT';
+  if(u.startsWith('un')) return 'UN';
+  return String(txt).trim().toUpperCase().slice(0,8);
+}
 function parseSheetRows(rows,catForcada){
   if(!rows||!rows.length)return [];
   const headers=rows[0].map(x=>x==null?'':String(x));
@@ -1015,6 +1041,7 @@ function parseSheetRows(rows,catForcada){
   const iIa=findCol(headers,['principio ativo','i.a','ingrediente']);
   const iGrupo=findCol(headers,['grupo','tipo','categoria']);
   const iVenc=findCol(headers,['vencimento','venc']);
+  const iUnid=findCol(headers,['unidade','unid','un.']);
   const iPreco=findCol(headers,['preco','preço','valor']);
   const out=[];
   for(let r=1;r<rows.length;r++){
@@ -1026,11 +1053,12 @@ function parseSheetRows(rows,catForcada){
     // grupo: da coluna GRUPO se existir; senão usa a forçada (aba)
     const cat = iGrupo>=0 ? normalizaGrupo(row[iGrupo]) : (catForcada||'DEFENSIVOS');
     const venc = iVenc>=0 ? normalizaVenc(row[iVenc]) : '';
+    const unid = iUnid>=0 ? normalizaUnid(row[iUnid]) : '';
     let preco=null;
     if(iPreco>=0&&row[iPreco]!=null&&row[iPreco]!==''){
       preco=parsePreco(row[iPreco]);
     }
-    out.push({cat,fab,prod,ia,venc,preco});
+    out.push({cat,fab,prod,ia,venc,unid,preco});
   }
   return out;
 }
@@ -1086,6 +1114,7 @@ function handleFile(file){
           if(p.ia && p.ia!==existente.ia){ existente.ia=p.ia; mudou=true; }
           if(p.cat && p.cat!==existente.cat){ existente.cat=p.cat; mudou=true; }
           if(p.venc && p.venc!==existente.venc){ existente.venc=p.venc; mudou=true; }
+          if(p.unid && p.unid!==existente.unid){ existente.unid=p.unid; mudou=true; }
           if(mudou){ upd++; paraAtualizar.push(existente); }
         }else{
           p._id=nextId++;
@@ -1108,12 +1137,12 @@ function handleFile(file){
               const fatia=paraAtualizar.slice(i,i+LOTE);
               setImportStatus('ok','Salvando na nuvem... ('+Math.min(i+LOTE,paraAtualizar.length)+'/'+paraAtualizar.length+')');
               const results=await Promise.all(fatia.map(p=>
-                sb.from('produtos').update({preco:p.preco, cat:p.cat, ia:p.ia, vencimento:p.venc||null}).eq('id',p._id)
+                sb.from('produtos').update({preco:p.preco, cat:p.cat, ia:p.ia, vencimento:p.venc||null, unidade:p.unid||null}).eq('id',p._id)
               ));
               results.forEach(r=>{ if(r&&r.error){ falhas++; ultimoErro=r.error; } });
             }
             if(paraInserir.length){
-              const payload=paraInserir.map(p=>({cat:p.cat,fab:p.fab,prod:p.prod,ia:p.ia,preco:p.preco,vencimento:p.venc||null}));
+              const payload=paraInserir.map(p=>({cat:p.cat,fab:p.fab,prod:p.prod,ia:p.ia,preco:p.preco,vencimento:p.venc||null,unidade:p.unid||'LT'}));
               const {data,error}=await sb.from('produtos').insert(payload).select();
               if(error) throw error;
               if(data){ data.forEach((row,i)=>{ if(paraInserir[i]) paraInserir[i]._id=row.id; }); }
