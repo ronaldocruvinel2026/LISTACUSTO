@@ -208,6 +208,8 @@ footer{border-top:1px solid var(--line);padding:20px 0;text-align:center;font-si
 .grp-marg-div{font-size:11.5px;color:var(--muted);font-weight:600}
 .grp-marg-del{background:none;border:0;color:var(--danger);font-size:15px;cursor:pointer;padding:2px 6px;border-radius:6px;opacity:.7}
 .grp-marg-del:hover{opacity:1;background:var(--danger-soft)}
+.grp-marg-item.grp-novo{border-color:var(--gold);background:var(--gold-soft);box-shadow:0 0 0 2px rgba(200,149,43,.25)}
+.grp-badge-novo{display:inline-block;margin-left:8px;font-size:9.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#fff;background:var(--gold);border-radius:5px;padding:2px 7px;vertical-align:middle}
 .camp-tag-man{display:inline-block;margin-left:6px;font-size:9.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--gold);background:var(--gold-soft);border:1px solid #e8d8b0;border-radius:5px;padding:1px 5px;vertical-align:middle}
 .camp-scroll-dica{display:none;font-size:11.5px;color:var(--muted);font-weight:600;text-align:center;padding:6px 0;background:var(--gold-soft);border-radius:8px;margin-bottom:6px}
 @media(max-width:640px){ .camp-scroll-dica{display:block} }
@@ -1278,6 +1280,7 @@ function handleFile(file){
 /* ================= CAMPANHAS (margem por grupo) ================= */
 const TAXA_MENSAL_CAMP=0.01; // 1% ao mês
 let margensGrupo={};     // { 'DEFENSIVO':0.20, 'ESPECIALIDADE':0.30, ... }
+let gruposRecemCriados=[]; // grupos criados na última importação (destaque p/ definir margem)
 let campanhas=[];        // [{id, nome, itens:[{id,fab,prod,ia,grupo,custo,venc,unid}]}]
 let campAtualId=null;
 
@@ -1349,14 +1352,15 @@ function renderMargens(){
   if(!box) return;
   const grupos=Object.keys(margensGrupo).sort();
   if(!grupos.length){ box.innerHTML='<div class="mc-vazio" style="padding:12px">Nenhum grupo. Adicione abaixo.</div>'; return; }
-  box.innerHTML=grupos.map(g=>
-    '<div class="grp-marg-item">'+
-      '<span class="grp-marg-nome">'+esc(g)+'</span>'+
+  box.innerHTML=grupos.map(g=>{
+    const novo=gruposRecemCriados.indexOf(g)>=0;
+    return '<div class="grp-marg-item'+(novo?' grp-novo':'')+'">'+
+      '<span class="grp-marg-nome">'+esc(g)+(novo?'<span class="grp-badge-novo">novo — defina a margem</span>':'')+'</span>'+
       '<div class="grp-marg-edit"><input class="grp-marg-input" data-grp="'+esc(g)+'" type="text" inputmode="decimal" value="'+Math.round(margensGrupo[g]*100)+'"><span>%</span>'+
       '<span class="grp-marg-div">(÷ '+(1-margensGrupo[g]).toFixed(2).replace('.',',')+')</span>'+
       '<button class="grp-marg-del" data-delgrp="'+esc(g)+'" title="Remover grupo">✕</button></div>'+
-    '</div>'
-  ).join('');
+    '</div>';
+  }).join('');
   box.querySelectorAll('.grp-marg-input').forEach(inp=>{
     inp.onchange=()=>salvarMargemGrupo(inp.dataset.grp, inp.value);
     inp.onkeydown=e=>{ if(e.key==='Enter') inp.blur(); };
@@ -1507,11 +1511,13 @@ function handleCampFile(file){
       }
       campanhas=[];
 
-      // garantir que os grupos da planilha existam nas margens (senão cria com 20%)
+      // garantir que os grupos da planilha existam nas margens (senão cria SEM margem definida)
       const gruposNovos=[...new Set(linhas.map(l=>normGrupo(l.grupo)).filter(Boolean))];
+      gruposRecemCriados=[];
       for(const g of gruposNovos){
         if(margensGrupo[g]==null){
-          margensGrupo[g]=0.20;
+          margensGrupo[g]=0.20; // padrão inicial, admin ajusta
+          gruposRecemCriados.push(g);
           if(sbReady){ try{ await sb.from('margens_grupo').upsert({grupo:g,margem:0.20},{onConflict:'grupo'}); }catch(_){} }
         }
       }
@@ -1536,7 +1542,9 @@ function handleCampFile(file){
       campAtualId=null;
       const selEl=document.getElementById('campSel'); if(selEl) selEl.value='';
       renderMargens(); preencherCampSelect(); renderCampDetalhe();
-      st.className='import-status ok'; st.textContent='✓ Importado: '+linhas.length+' produto(s) em '+nomes.length+' campanha(s) ('+nomes.join(', ')+'). Campanhas antigas removidas.';
+      let msg='✓ Importado: '+linhas.length+' produto(s) em '+nomes.length+' campanha(s) ('+nomes.join(', ')+'). Campanhas antigas removidas.';
+      if(gruposRecemCriados.length){ msg+=' ⚠ Grupo(s) novo(s) detectado(s): '+gruposRecemCriados.join(', ')+' — role até "Margem por grupo" e defina a margem (entraram com 20% provisório).'; }
+      st.className='import-status ok'; st.textContent=msg;
     }catch(err){ st.className='import-status err'; st.textContent='Erro ao ler a planilha: '+(err&&err.message?err.message:err); }
   };
   reader.readAsArrayBuffer(file);
