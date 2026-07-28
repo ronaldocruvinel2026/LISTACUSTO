@@ -198,6 +198,16 @@ footer{border-top:1px solid var(--line);padding:20px 0;text-align:center;font-si
 .camp-sug-add:disabled{opacity:.4;cursor:not-allowed}
 .camp-preco{font-weight:800;color:var(--leaf-dark);text-align:right;white-space:nowrap}
 .camp-custo{text-align:right;color:var(--muted);white-space:nowrap}
+/* margens por grupo */
+.grp-marg-list{display:flex;flex-direction:column;gap:8px}
+.grp-marg-item{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.grp-marg-nome{font-weight:800;font-size:13.5px;color:var(--leaf-dark);letter-spacing:.3px}
+.grp-marg-edit{display:flex;align-items:center;gap:8px}
+.grp-marg-input{width:64px;text-align:right;font-weight:800;color:var(--leaf-dark);font-size:14px;padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;outline:none;font-family:inherit}
+.grp-marg-input:focus{border-color:var(--leaf);background:var(--leaf-soft)}
+.grp-marg-div{font-size:11.5px;color:var(--muted);font-weight:600}
+.grp-marg-del{background:none;border:0;color:var(--danger);font-size:15px;cursor:pointer;padding:2px 6px;border-radius:6px;opacity:.7}
+.grp-marg-del:hover{opacity:1;background:var(--danger-soft)}
 </style>
 </head>
 <body>
@@ -618,45 +628,61 @@ global.XLSX=XLSX;
 <div class="panel" id="campView">
   <main>
     <div class="wrap">
-      <h2 class="section-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>Campanhas de preço de venda</h2>
-      <div class="import-note" style="margin-top:0;margin-bottom:16px">
-        Cada <b>campanha</b> (ex.: Estoque, Vencidos) tem uma <b>margem própria</b>. O preço de venda é calculado a partir do custo: <b>preço = [custo ÷ (1,01)^meses até vencimento] ÷ (1 − margem)</b>. Um mesmo produto pode entrar em várias campanhas com preços diferentes. Esta aba é só para o admin.
+      <h2 class="section-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>Campanhas &amp; margens de venda</h2>
+
+      <!-- MARGENS POR GRUPO -->
+      <h3 style="font-size:15px;font-weight:800;color:var(--leaf-dark);margin:0 0 10px">Margem por grupo</h3>
+      <div class="import-note" style="margin-top:0;margin-bottom:12px">
+        A margem é definida <b>por grupo</b> (DEFENSIVO, ESPECIALIDADE, ou outros que criar) e vale igual em todas as campanhas. O preço de venda é <b>[custo ÷ (1,01)^meses até vencimento] ÷ (1 − margem do grupo)</b>. O "PREÇO" da planilha é lido como <b>custo</b>.
+      </div>
+      <div id="grpMargList" class="grp-marg-list"></div>
+      <div class="camp-topo" style="margin-top:10px">
+        <input id="grpNovoNome" type="text" placeholder="Novo grupo (ex.: VENCIDOS)" class="camp-sel" style="min-width:180px">
+        <input id="grpNovaMarg" type="text" inputmode="decimal" placeholder="Margem % (ex.: 25)" class="camp-sel" style="min-width:140px;flex:0">
+        <button class="btn" id="grpAddBtn">+ Adicionar grupo</button>
       </div>
 
+      <div class="divider"></div>
+
+      <!-- IMPORTAR PLANILHA -->
+      <h3 style="font-size:15px;font-weight:800;color:var(--leaf-dark);margin:0 0 10px">Importar planilha de campanhas</h3>
+      <div class="import-box" id="campDrop">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="m9 15 3-3 3 3"/></svg>
+        <h3>Enviar planilha (.xlsx)</h3>
+        <p>Colunas: <b>CAMPANHA, FABRICANTE, PRODUTO, PRINCIPIO ATIVO (I.A), GRUPO, VENCIMENTO, UNIDADE, PREÇO</b>. O PREÇO é o custo. Reimportar <b>substitui</b> os dados das campanhas contidas na planilha.</p>
+        <button class="btn" id="campImportBtn">Escolher arquivo</button>
+        <input type="file" id="campFile" accept=".xlsx,.xls" hidden>
+      </div>
+      <div id="campImportStatus" class="import-status"></div>
+
+      <div class="divider"></div>
+
+      <!-- VISUALIZAR CAMPANHA -->
+      <h3 style="font-size:15px;font-weight:800;color:var(--leaf-dark);margin:0 0 10px">Conferir campanha</h3>
       <div class="camp-topo">
         <select id="campSel" class="camp-sel"><option value="">— selecione uma campanha —</option></select>
-        <button class="btn" id="campNova">+ Nova campanha</button>
-        <button class="btn ghost" id="campEditar" disabled>Editar</button>
-        <button class="btn danger" id="campExcluir" disabled>Excluir</button>
+        <button class="btn danger" id="campExcluir" disabled>Excluir campanha</button>
       </div>
-
-      <div id="campVazio" class="mc-vazio" style="display:none">Nenhuma campanha ainda. Crie a primeira com "+ Nova campanha".</div>
+      <div id="campVazio" class="mc-vazio" style="display:none">Nenhuma campanha ainda. Importe uma planilha para criar.</div>
 
       <div id="campDetalhe" style="display:none">
         <div class="camp-head">
           <div class="camp-head-info">
             <div class="camp-head-nome" id="campNome">—</div>
-            <div class="camp-head-marg" id="campMarg">Margem: —</div>
           </div>
           <div class="camp-head-stat" id="campStat">0 produtos</div>
         </div>
-
-        <div class="camp-addbar">
+        <div class="camp-addbar" style="margin-bottom:10px">
           <div class="search" style="flex:1;min-width:200px">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-            <input id="campAddBusca" type="text" placeholder="Buscar produto da lista de custos para adicionar...">
+            <input id="campVerBusca" type="text" placeholder="Filtrar produtos da campanha...">
           </div>
-          <button class="btn gold" id="campImportBtn">Importar Excel da campanha</button>
-          <input type="file" id="campFile" accept=".xlsx,.xls" hidden>
         </div>
-        <div id="campAddSug" class="camp-add-sug"></div>
-        <div id="campImportStatus" class="import-status"></div>
-
-        <div class="mtable-wrap" style="margin-top:14px">
+        <div class="mtable-wrap">
           <table class="mtable">
             <thead><tr>
-              <th>Fabricante</th><th>Produto</th><th class="hide-sm">Vencimento</th>
-              <th style="text-align:right">Custo</th><th style="text-align:right">Preço venda</th><th></th>
+              <th>Fabricante</th><th>Produto</th><th class="hide-sm">Grupo</th><th class="hide-sm">Venc.</th>
+              <th style="text-align:right">Custo</th><th style="text-align:right">Preço venda</th>
             </tr></thead>
             <tbody id="campBody"></tbody>
           </table>
@@ -669,25 +695,6 @@ global.XLSX=XLSX;
   </main>
 </div>
 
-<!-- MODAL CAMPANHA (criar/editar) -->
-<div class="modal-bg" id="campModal">
-  <div class="modal">
-    <h3 id="campModalTit" style="color:var(--leaf-dark)">Nova campanha</h3>
-    <div style="margin-bottom:14px">
-      <label style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:5px">Nome da campanha</label>
-      <input id="campModalNome" type="text" placeholder="Ex.: Estoque, Vencidos" style="width:100%;padding:11px 13px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;outline:none;font-family:inherit">
-    </div>
-    <div style="margin-bottom:20px">
-      <label style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:5px">Margem (%)</label>
-      <input id="campModalMarg" type="text" inputmode="decimal" placeholder="Ex.: 20" style="width:100%;padding:11px 13px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;outline:none;font-family:inherit">
-      <div style="font-size:11.5px;color:var(--muted);margin-top:5px">Digite só o número. Ex.: 20 significa dividir o custo por 0,80.</div>
-    </div>
-    <div class="modal-btns">
-      <button class="btn ghost" id="campModalCancel">Cancelar</button>
-      <button class="btn" id="campModalOk">Salvar</button>
-    </div>
-  </div>
-</div>
 
 <!-- MODAL -->
 <div class="modal-bg" id="modalBg">
@@ -1263,204 +1270,152 @@ function handleFile(file){
 
 /* tabs */
 
-/* ================= CAMPANHAS ================= */
+/* ================= CAMPANHAS (margem por grupo) ================= */
 const TAXA_MENSAL_CAMP=0.01; // 1% ao mês
-let campanhas=[];        // {id, nome, margem, itens:[...]}
-let campAtualId=null;    // campanha selecionada
+let margensGrupo={};     // { 'DEFENSIVO':0.20, 'ESPECIALIDADE':0.30, ... }
+let campanhas=[];        // [{id, nome, itens:[{id,fab,prod,ia,grupo,custo,venc,unid}]}]
+let campAtualId=null;
 
-// meses do hoje até o vencimento (aceita dd/mm/aaaa ou mm/aaaa)
+function normGrupo(txt){
+  const g=norm(txt||'');
+  if(g.includes('especialidad')) return 'ESPECIALIDADE';
+  if(g.includes('defensiv')||g.includes('defenciv')) return 'DEFENSIVO';
+  return (txt||'').toString().trim().toUpperCase();
+}
+function margemDoGrupo(grupo){
+  const g=normGrupo(grupo);
+  return (margensGrupo[g]!=null)?margensGrupo[g]:0.20;
+}
 function mesesAteVenc(venc){
   if(!venc) return 0;
-  let d,m,a;
-  let s=String(venc).trim();
+  let s=String(venc).trim(),d,m,a;
   let mm=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
   if(mm){ d=+mm[1]; m=+mm[2]; a=+mm[3]; }
   else{ let m2=/^(\d{1,2})\/(\d{4})$/.exec(s); if(m2){ d=1; m=+m2[1]; a=+m2[2]; } else return 0; }
-  const alvo=new Date(a,m-1,d||1);
-  const hoje=new Date();
+  const alvo=new Date(a,m-1,d||1), hoje=new Date();
   let meses=(alvo.getFullYear()-hoje.getFullYear())*12+(alvo.getMonth()-hoje.getMonth());
-  if(meses<0) meses=0;
-  return meses;
+  return meses<0?0:meses;
 }
-// preço de venda de um custo, dada a margem (fração 0..1) e o vencimento
-function precoCampanha(custo, margem, venc){
-  if(custo==null || custo<=0) return null;
-  if(margem==null || margem>=1) return null;
-  const meses=mesesAteVenc(venc);
-  const base=custo/Math.pow(1+TAXA_MENSAL_CAMP,meses);
+function precoVenda(custo, grupo, venc){
+  if(custo==null||custo<=0) return null;
+  const margem=margemDoGrupo(grupo);
+  if(margem>=1) return null;
+  const base=custo/Math.pow(1+TAXA_MENSAL_CAMP,mesesAteVenc(venc));
   return base/(1-margem);
-}
-// acha o produto na lista de custos por fab+prod
-function acharCusto(fab,prod){
-  const kf=norm(fab), kp=norm(prod);
-  return DATA.find(p=>norm(p.fab)===kf && norm(p.prod)===kp) || null;
 }
 
 async function carregarCampanhas(){
-  if(!sbReady){ return; }
+  if(!sbReady) return;
   try{
-    const {data:camps,error:e1}=await sb.from('campanhas').select('*').order('ordem',{ascending:true}).order('id',{ascending:true});
-    if(e1) throw e1;
-    const {data:itens,error:e2}=await sb.from('campanha_itens').select('*');
-    if(e2) throw e2;
-    campanhas=(camps||[]).map(c=>({id:c.id, nome:c.nome, margem:+c.margem, ativa:c.ativa!==false,
+    const {data:mg}=await sb.from('margens_grupo').select('*');
+    margensGrupo={};
+    (mg||[]).forEach(r=>{ margensGrupo[normGrupo(r.grupo)]=+r.margem; });
+    if(margensGrupo['DEFENSIVO']==null) margensGrupo['DEFENSIVO']=0.20;
+    if(margensGrupo['ESPECIALIDADE']==null) margensGrupo['ESPECIALIDADE']=0.30;
+    const {data:camps}=await sb.from('campanhas').select('*').order('ordem',{ascending:true}).order('id',{ascending:true});
+    const {data:itens}=await sb.from('campanha_itens').select('*');
+    campanhas=(camps||[]).map(c=>({id:c.id,nome:c.nome,
       itens:(itens||[]).filter(it=>it.campanha_id===c.id).map(it=>({
-        id:it.id, fab:it.fab||'', prod:it.prod||'', ia:it.ia||'', custo:it.custo, venc:it.vencimento||'', unid:it.unidade||'LT', preco:it.preco
+        id:it.id, fab:it.fab||'', prod:it.prod||'', ia:it.ia||'', grupo:it.grupo||'', custo:it.custo, venc:it.vencimento||'', unid:it.unidade||'LT'
       }))
     }));
   }catch(e){ if(window.console)console.warn('Erro campanhas:',e); }
 }
 
+/* ---- margens por grupo ---- */
+function renderMargens(){
+  const box=document.getElementById('grpMargList');
+  if(!box) return;
+  const grupos=Object.keys(margensGrupo).sort();
+  if(!grupos.length){ box.innerHTML='<div class="mc-vazio" style="padding:12px">Nenhum grupo. Adicione abaixo.</div>'; return; }
+  box.innerHTML=grupos.map(g=>
+    '<div class="grp-marg-item">'+
+      '<span class="grp-marg-nome">'+esc(g)+'</span>'+
+      '<div class="grp-marg-edit"><input class="grp-marg-input" data-grp="'+esc(g)+'" type="text" inputmode="decimal" value="'+Math.round(margensGrupo[g]*100)+'"><span>%</span>'+
+      '<span class="grp-marg-div">(÷ '+(1-margensGrupo[g]).toFixed(2).replace('.',',')+')</span>'+
+      '<button class="grp-marg-del" data-delgrp="'+esc(g)+'" title="Remover grupo">✕</button></div>'+
+    '</div>'
+  ).join('');
+  box.querySelectorAll('.grp-marg-input').forEach(inp=>{
+    inp.onchange=()=>salvarMargemGrupo(inp.dataset.grp, inp.value);
+    inp.onkeydown=e=>{ if(e.key==='Enter') inp.blur(); };
+  });
+  box.querySelectorAll('[data-delgrp]').forEach(b=>b.onclick=()=>removerGrupo(b.dataset.delgrp));
+}
+async function salvarMargemGrupo(grupo, raw){
+  let m=parseFloat(String(raw).replace(',','.').replace(/[^0-9.]/g,''));
+  if(isNaN(m)||m<0||m>=100){ alert('Margem inválida (0 a 99).'); renderMargens(); return; }
+  const margem=m/100;
+  margensGrupo[normGrupo(grupo)]=margem;
+  if(sbReady){ try{ await sb.from('margens_grupo').upsert({grupo:normGrupo(grupo),margem:margem},{onConflict:'grupo'}); }catch(e){ alert('Erro ao salvar margem: '+(e.message||e)); } }
+  renderMargens(); renderCampDetalhe();
+}
+async function adicionarGrupo(){
+  const nome=normGrupo(document.getElementById('grpNovoNome').value);
+  let m=parseFloat(String(document.getElementById('grpNovaMarg').value).replace(',','.').replace(/[^0-9.]/g,''));
+  if(!nome){ alert('Digite o nome do grupo.'); return; }
+  if(isNaN(m)||m<0||m>=100){ alert('Margem inválida (0 a 99).'); return; }
+  margensGrupo[nome]=m/100;
+  if(sbReady){ try{ await sb.from('margens_grupo').upsert({grupo:nome,margem:m/100},{onConflict:'grupo'}); }catch(e){ alert('Erro: '+(e.message||e)); } }
+  document.getElementById('grpNovoNome').value=''; document.getElementById('grpNovaMarg').value='';
+  renderMargens(); renderCampDetalhe();
+}
+async function removerGrupo(grupo){
+  if(!confirm('Remover o grupo "'+grupo+'"? Os produtos desse grupo passam a usar 20% padrão até você recriar.')) return;
+  delete margensGrupo[normGrupo(grupo)];
+  if(sbReady){ try{ await sb.from('margens_grupo').delete().eq('grupo',normGrupo(grupo)); }catch(e){ alert('Erro: '+(e.message||e)); } }
+  renderMargens(); renderCampDetalhe();
+}
+
+/* ---- visualizar campanha ---- */
 function preencherCampSelect(){
   const sel=document.getElementById('campSel');
   if(!sel) return;
   const atual=campAtualId;
-  sel.innerHTML='<option value="">— selecione uma campanha —</option>'+
-    campanhas.map(c=>'<option value="'+c.id+'">'+esc(c.nome)+' ('+Math.round(c.margem*100)+'%)</option>').join('');
-  if(atual && campanhas.some(c=>c.id===atual)) sel.value=atual;
+  sel.innerHTML='<option value="">— selecione uma campanha —</option>'+campanhas.map(c=>'<option value="'+c.id+'">'+esc(c.nome)+' ('+c.itens.length+')</option>').join('');
+  if(atual&&campanhas.some(c=>c.id===atual)) sel.value=atual;
   document.getElementById('campVazio').style.display=campanhas.length?'none':'block';
 }
-
 function campSelecionada(){ return campanhas.find(c=>c.id===campAtualId)||null; }
-
 function renderCampDetalhe(){
   const det=document.getElementById('campDetalhe');
   const c=campSelecionada();
-  document.getElementById('campEditar').disabled=!c;
   document.getElementById('campExcluir').disabled=!c;
   if(!c){ det.style.display='none'; return; }
   det.style.display='block';
   document.getElementById('campNome').textContent=c.nome;
-  document.getElementById('campMarg').textContent='Margem: '+Math.round(c.margem*100)+'%  ·  custo ÷ '+(1-c.margem).toFixed(2).replace('.',',');
   document.getElementById('campStat').textContent=c.itens.length+' produto'+(c.itens.length===1?'':'s');
+  const q=norm(document.getElementById('campVerBusca')?document.getElementById('campVerBusca').value:'');
+  let itens=c.itens.slice();
+  if(q) itens=itens.filter(it=>norm(it.prod).includes(q)||norm(it.fab).includes(q)||norm(it.ia).includes(q));
+  itens.sort((a,b)=>(a.fab+a.prod).localeCompare(b.fab+b.prod,'pt'));
   const body=document.getElementById('campBody');
-  if(!c.itens.length){ body.innerHTML='<tr><td colspan="6" style="text-align:center;padding:26px;color:var(--muted)">Nenhum produto nesta campanha. Use a busca acima para adicionar.</td></tr>'; }
+  if(!itens.length){ body.innerHTML='<tr><td colspan="6" style="text-align:center;padding:26px;color:var(--muted)">Nenhum produto.</td></tr>'; }
   else{
-    body.innerHTML=c.itens.slice().sort((a,b)=>(a.fab+a.prod).localeCompare(b.fab+b.prod,'pt')).map(it=>{
-      const pv=precoCampanha(it.custo, c.margem, it.venc);
+    body.innerHTML=itens.map(it=>{
+      const pv=precoVenda(it.custo,it.grupo,it.venc);
       return '<tr>'+
         '<td class="m-fab">'+esc(it.fab||'—')+'</td>'+
         '<td class="t-name">'+esc(it.prod||'—')+'</td>'+
+        '<td class="t-ia hide-sm">'+esc(normGrupo(it.grupo)||'—')+'</td>'+
         '<td class="t-venc hide-sm">'+(it.venc?esc(it.venc):'—')+'</td>'+
         '<td class="camp-custo">'+(it.custo!=null?('R$ '+fmtBRL(it.custo)):'—')+'</td>'+
         '<td class="camp-preco">'+(pv!=null?('R$ '+fmtBRL(pv)):'—')+'</td>'+
-        '<td style="text-align:center"><button class="row-del" data-rem="'+it.id+'" title="Tirar da campanha">✕</button></td>'+
       '</tr>';
     }).join('');
-    body.querySelectorAll('[data-rem]').forEach(b=>b.onclick=()=>removerItemCampanha(+b.dataset.rem));
   }
   document.getElementById('campCount').textContent=c.itens.length+' produto(s) na campanha "'+c.nome+'"';
 }
-
-// sugestões de produtos da lista de custos para adicionar
-function renderCampSug(){
-  const box=document.getElementById('campAddSug');
-  const c=campSelecionada();
-  const q=norm(document.getElementById('campAddBusca').value);
-  if(!c || !q){ box.classList.remove('on'); box.innerHTML=''; return; }
-  const jaTem=new Set(c.itens.map(it=>norm(it.fab)+'|'+norm(it.prod)));
-  const res=DATA.filter(p=>{
-    const k=norm(p.fab)+'|'+norm(p.prod);
-    if(jaTem.has(k)) return false;
-    return norm(p.prod).includes(q)||norm(p.fab).includes(q)||norm(p.ia).includes(q);
-  }).slice(0,40);
-  if(!res.length){ box.classList.add('on'); box.innerHTML='<div class="camp-sug-item"><div class="camp-sug-nome" style="color:var(--muted)">Nenhum produto novo encontrado.</div></div>'; return; }
-  box.classList.add('on');
-  box.innerHTML=res.map(p=>{
-    const pv=precoCampanha(p.preco, c.margem, p.venc);
-    return '<div class="camp-sug-item">'+
-      '<div><div class="camp-sug-nome">'+esc(p.prod)+'</div>'+
-      '<div class="camp-sug-meta">'+esc(p.fab)+(p.preco!=null?(' · custo R$ '+fmtBRL(p.preco)):' · sem custo')+(pv!=null?(' · venda R$ '+fmtBRL(pv)):'')+'</div></div>'+
-      '<button class="camp-sug-add" data-add="'+esc(p.fab)+'|||'+esc(p.prod)+'">Adicionar</button>'+
-    '</div>';
-  }).join('');
-  box.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{
-    const [fab,prod]=b.dataset.add.split('|||');
-    adicionarItemCampanha(fab,prod);
-  });
-}
-
-async function adicionarItemCampanha(fab,prod){
-  const c=campSelecionada(); if(!c) return;
-  const base=acharCusto(fab,prod); if(!base) return;
-  if(c.itens.some(it=>norm(it.fab)===norm(fab)&&norm(it.prod)===norm(prod))) return;
-  const pv=precoCampanha(base.preco, c.margem, base.venc);
-  const registro={campanha_id:c.id, fab:base.fab, prod:base.prod, ia:base.ia||'', custo:base.preco, vencimento:base.venc||null, unidade:base.unid||'LT', preco:pv};
-  if(sbReady){
-    try{
-      const {data,error}=await sb.from('campanha_itens').insert([registro]).select();
-      if(error) throw error;
-      const novo=data&&data[0];
-      c.itens.push({id:novo?novo.id:Date.now(), fab:base.fab, prod:base.prod, ia:base.ia||'', custo:base.preco, venc:base.venc||'', unid:base.unid||'LT', preco:pv});
-    }catch(e){ alert('Erro ao adicionar na nuvem: '+(e.message||e)); return; }
-  } else {
-    c.itens.push({id:Date.now(), fab:base.fab, prod:base.prod, ia:base.ia||'', custo:base.preco, venc:base.venc||'', unid:base.unid||'LT', preco:pv});
-  }
-  document.getElementById('campAddBusca').value='';
-  renderCampSug(); renderCampDetalhe(); preencherCampSelect();
-}
-
-async function removerItemCampanha(id){
-  const c=campSelecionada(); if(!c) return;
-  if(sbReady){ try{ await sb.from('campanha_itens').delete().eq('id',id); }catch(e){ alert('Erro ao remover na nuvem: '+(e.message||e)); return; } }
-  c.itens=c.itens.filter(it=>it.id!==id);
-  renderCampDetalhe(); preencherCampSelect();
-}
-
-/* criar/editar campanha via modal */
-let campModalEdit=null; // null=nova, ou id
-function abrirCampModal(edit){
-  campModalEdit=edit||null;
-  const c=edit?campanhas.find(x=>x.id===edit):null;
-  document.getElementById('campModalTit').textContent=c?'Editar campanha':'Nova campanha';
-  document.getElementById('campModalNome').value=c?c.nome:'';
-  document.getElementById('campModalMarg').value=c?String(Math.round(c.margem*100)):'';
-  document.getElementById('campModal').classList.add('on');
-}
-function fecharCampModal(){ document.getElementById('campModal').classList.remove('on'); }
-async function salvarCampModal(){
-  const nome=document.getElementById('campModalNome').value.trim();
-  let mraw=document.getElementById('campModalMarg').value.replace(',','.').replace(/[^0-9.]/g,'');
-  let mnum=parseFloat(mraw);
-  if(!nome){ alert('Digite o nome da campanha.'); return; }
-  if(isNaN(mnum)||mnum<0||mnum>=100){ alert('Margem inválida. Digite um número entre 0 e 99 (ex.: 20).'); return; }
-  const margem=mnum/100;
-  if(campModalEdit){
-    const c=campanhas.find(x=>x.id===campModalEdit);
-    if(sbReady){ try{ await sb.from('campanhas').update({nome:nome,margem:margem}).eq('id',campModalEdit); }catch(e){ alert('Erro ao salvar: '+(e.message||e)); return; } }
-    c.nome=nome; c.margem=margem;
-    // recalcular preços dos itens com a nova margem
-    for(const it of c.itens){ it.preco=precoCampanha(it.custo,margem,it.venc); }
-    if(sbReady){ for(const it of c.itens){ try{ await sb.from('campanha_itens').update({preco:it.preco}).eq('id',it.id); }catch(e){} } }
-  } else {
-    let novoId=Date.now();
-    if(sbReady){
-      try{ const {data,error}=await sb.from('campanhas').insert([{nome:nome,margem:margem,ativa:true,ordem:campanhas.length}]).select(); if(error) throw error; if(data&&data[0]) novoId=data[0].id; }
-      catch(e){ alert('Erro ao criar na nuvem: '+(e.message||e)); return; }
-    }
-    campanhas.push({id:novoId,nome:nome,margem:margem,ativa:true,itens:[]});
-    campAtualId=novoId;
-  }
-  fecharCampModal();
-  preencherCampSelect();
-  document.getElementById('campSel').value=campAtualId||'';
-  renderCampDetalhe();
-}
 async function excluirCampanha(){
   const c=campSelecionada(); if(!c) return;
-  if(!confirm('Excluir a campanha "'+c.nome+'" e todos os seus produtos? Esta ação não pode ser desfeita.')) return;
-  if(sbReady){ try{ await sb.from('campanhas').delete().eq('id',c.id); }catch(e){ alert('Erro ao excluir: '+(e.message||e)); return; } }
-  campanhas=campanhas.filter(x=>x.id!==c.id);
-  campAtualId=null;
-  preencherCampSelect();
-  document.getElementById('campSel').value='';
-  renderCampDetalhe();
+  if(!confirm('Excluir a campanha "'+c.nome+'" e todos os seus produtos?')) return;
+  if(sbReady){ try{ await sb.from('campanhas').delete().eq('id',c.id); }catch(e){ alert('Erro: '+(e.message||e)); return; } }
+  campanhas=campanhas.filter(x=>x.id!==c.id); campAtualId=null;
+  preencherCampSelect(); document.getElementById('campSel').value=''; renderCampDetalhe();
 }
 
-/* importar Excel só da campanha: espera colunas FABRICANTE, PRODUTO (o custo vem da lista) */
+/* ---- importação da planilha (CAMPANHA + GRUPO + custo) ---- */
 function handleCampFile(file){
-  const c=campSelecionada();
-  if(!c){ alert('Selecione uma campanha primeiro.'); return; }
   if(!file) return;
   const st=document.getElementById('campImportStatus');
   st.className='import-status'; st.textContent='';
@@ -1469,55 +1424,96 @@ function handleCampFile(file){
   reader.onload=async function(e){
     try{
       const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
-      let achados=0, naoencontrados=0, jatinha=0, novos=[];
+      // ler todas as abas, montar linhas
+      let linhas=[];
       wb.SheetNames.forEach(function(sn){
         const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:null});
         if(!rows||!rows.length) return;
         const H=rows[0].map(x=>norm(x==null?'':String(x)));
-        const iFab=H.findIndex(h=>h.includes('fabricante'));
-        const iProd=H.findIndex(h=>h.includes('produto'));
-        if(iProd<0) return;
+        const col=(alts)=>{ for(const a of alts){ let i=H.findIndex(h=>h===norm(a)); if(i<0)i=H.findIndex(h=>h.includes(norm(a))); if(i>=0)return i; } return -1; };
+        const iCamp=col(['campanha']), iFab=col(['fabricante']), iProd=col(['produto']),
+              iIa=col(['principio ativo','i.a','ingrediente']), iGrupo=col(['grupo']),
+              iVenc=col(['vencimento','venc']), iUnid=col(['unidade','unid']), iPreco=col(['preco','preço','custo','valor']);
+        if(iProd<0||iCamp<0) return;
         for(let r=1;r<rows.length;r++){
           const row=rows[r]; if(!row) continue;
-          const fab=iFab>=0&&row[iFab]!=null?String(row[iFab]).trim():'';
+          const camp=iCamp>=0&&row[iCamp]!=null?String(row[iCamp]).trim():'';
           const prod=iProd>=0&&row[iProd]!=null?String(row[iProd]).trim():'';
-          if(!prod) continue;
-          const base=acharCusto(fab,prod) || DATA.find(p=>norm(p.prod)===norm(prod));
-          if(!base){ naoencontrados++; continue; }
-          if(c.itens.some(it=>norm(it.fab)===norm(base.fab)&&norm(it.prod)===norm(base.prod))){ jatinha++; continue; }
-          if(novos.some(n=>norm(n.fab)===norm(base.fab)&&norm(n.prod)===norm(base.prod))) continue;
-          novos.push(base); achados++;
+          if(!camp||!prod) continue;
+          linhas.push({
+            campanha:camp,
+            fab:iFab>=0&&row[iFab]!=null?String(row[iFab]).trim():'',
+            prod:prod,
+            ia:iIa>=0&&row[iIa]!=null?String(row[iIa]).trim():'',
+            grupo:iGrupo>=0?normGrupo(row[iGrupo]):'',
+            venc:iVenc>=0?normalizaVenc(row[iVenc]):'',
+            unid:iUnid>=0&&row[iUnid]!=null?String(row[iUnid]).trim().toUpperCase():'LT',
+            custo:iPreco>=0?parsePreco(row[iPreco]):null
+          });
         }
       });
-      if(!novos.length){ st.className='import-status err'; st.textContent='Nenhum produto novo para adicionar. (Encontrados na lista: '+achados+', já na campanha: '+jatinha+', sem correspondência: '+naoencontrados+')'; return; }
-      st.className='import-status ok'; st.textContent='Adicionando '+novos.length+' produto(s)...';
-      // inserir em lote
-      const payload=novos.map(base=>({campanha_id:c.id, fab:base.fab, prod:base.prod, ia:base.ia||'', custo:base.preco, vencimento:base.venc||null, unidade:base.unid||'LT', preco:precoCampanha(base.preco,c.margem,base.venc)}));
-      if(sbReady){
-        const {data,error}=await sb.from('campanha_itens').insert(payload).select();
-        if(error){ st.className='import-status err'; st.textContent='Erro ao salvar na nuvem: '+(error.message||error); return; }
-        (data||[]).forEach(row=>{ c.itens.push({id:row.id, fab:row.fab, prod:row.prod, ia:row.ia||'', custo:row.custo, venc:row.vencimento||'', unid:row.unidade||'LT', preco:row.preco}); });
-      } else {
-        payload.forEach(p=>c.itens.push({id:Date.now()+Math.random(), fab:p.fab, prod:p.prod, ia:p.ia, custo:p.custo, venc:p.vencimento||'', unid:p.unidade, preco:p.preco}));
+      if(!linhas.length){ st.className='import-status err'; st.textContent='Nenhuma linha válida. Confira as colunas CAMPANHA e PRODUTO.'; return; }
+
+      // agrupar por campanha
+      const porCamp={};
+      linhas.forEach(l=>{ (porCamp[l.campanha]=porCamp[l.campanha]||[]).push(l); });
+      const nomes=Object.keys(porCamp);
+      st.className='import-status ok'; st.textContent='Importando '+linhas.length+' linha(s) em '+nomes.length+' campanha(s)...';
+
+      // garantir que os grupos da planilha existam nas margens (senão cria com 20%)
+      const gruposNovos=[...new Set(linhas.map(l=>normGrupo(l.grupo)).filter(Boolean))];
+      for(const g of gruposNovos){
+        if(margensGrupo[g]==null){
+          margensGrupo[g]=0.20;
+          if(sbReady){ try{ await sb.from('margens_grupo').upsert({grupo:g,margem:0.20},{onConflict:'grupo'}); }catch(_){} }
+        }
       }
-      st.className='import-status ok'; st.textContent='✓ '+novos.length+' produto(s) adicionado(s) à campanha "'+c.nome+'". (Já tinha: '+jatinha+', sem correspondência na lista: '+naoencontrados+')';
-      renderCampDetalhe(); preencherCampSelect();
+
+      for(const nome of nomes){
+        // achar ou criar campanha
+        let c=campanhas.find(x=>norm(x.nome)===norm(nome));
+        if(!c){
+          let novoId=Date.now()+Math.floor(Math.random()*1000);
+          if(sbReady){ try{ const {data}=await sb.from('campanhas').insert([{nome:nome,ativa:true,ordem:campanhas.length}]).select(); if(data&&data[0])novoId=data[0].id; }catch(err){} }
+          c={id:novoId,nome:nome,itens:[]}; campanhas.push(c);
+        }
+        // SUBSTITUI: apagar itens antigos da campanha
+        if(sbReady){ try{ await sb.from('campanha_itens').delete().eq('campanha_id',c.id); }catch(_){} }
+        c.itens=[];
+        // inserir novos
+        const payload=porCamp[nome].map(l=>({campanha_id:c.id, fab:l.fab, prod:l.prod, ia:l.ia, grupo:normGrupo(l.grupo), custo:l.custo, vencimento:l.venc||null, unidade:l.unid||'LT'}));
+        if(sbReady){
+          for(let i=0;i<payload.length;i+=200){
+            const {data,error}=await sb.from('campanha_itens').insert(payload.slice(i,i+200)).select();
+            if(error){ st.className='import-status err'; st.textContent='Erro ao salvar na nuvem: '+(error.message||error); return; }
+            (data||[]).forEach(row=>c.itens.push({id:row.id,fab:row.fab,prod:row.prod,ia:row.ia,grupo:row.grupo,custo:row.custo,venc:row.vencimento||'',unid:row.unidade||'LT'}));
+          }
+        } else {
+          payload.forEach(p=>c.itens.push({id:Date.now()+Math.random(),fab:p.fab,prod:p.prod,ia:p.ia,grupo:p.grupo,custo:p.custo,venc:p.vencimento||'',unid:p.unidade}));
+        }
+      }
+      renderMargens(); preencherCampSelect(); renderCampDetalhe();
+      st.className='import-status ok'; st.textContent='✓ Importado: '+linhas.length+' produto(s) em '+nomes.length+' campanha(s) ('+nomes.join(', ')+').';
     }catch(err){ st.className='import-status err'; st.textContent='Erro ao ler a planilha: '+(err&&err.message?err.message:err); }
   };
   reader.readAsArrayBuffer(file);
 }
 
-/* ligações da aba campanhas */
-document.getElementById('campSel').onchange=function(e){ campAtualId=e.target.value?(+e.target.value):null; renderCampDetalhe(); document.getElementById('campAddSug').classList.remove('on'); document.getElementById('campAddBusca').value=''; };
-document.getElementById('campNova').onclick=()=>abrirCampModal(null);
-document.getElementById('campEditar').onclick=()=>{ if(campSelecionada()) abrirCampModal(campAtualId); };
+/* ---- ligações ---- */
+document.getElementById('grpAddBtn').onclick=adicionarGrupo;
+document.getElementById('campSel').onchange=function(e){ campAtualId=e.target.value?(+e.target.value):null; if(document.getElementById('campVerBusca'))document.getElementById('campVerBusca').value=''; renderCampDetalhe(); };
 document.getElementById('campExcluir').onclick=excluirCampanha;
-document.getElementById('campModalCancel').onclick=fecharCampModal;
-document.getElementById('campModalOk').onclick=salvarCampModal;
-document.getElementById('campModal').onclick=e=>{ if(e.target.id==='campModal') fecharCampModal(); };
-document.getElementById('campAddBusca').oninput=renderCampSug;
+document.getElementById('campVerBusca').oninput=renderCampDetalhe;
 document.getElementById('campImportBtn').onclick=()=>document.getElementById('campFile').click();
 document.getElementById('campFile').onchange=e=>{ if(e.target.files&&e.target.files[0]){ handleCampFile(e.target.files[0]); e.target.value=''; } };
+(function(){
+  const drop=document.getElementById('campDrop');
+  if(drop){
+    ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag');}));
+    ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag');}));
+    drop.addEventListener('drop',e=>{ if(e.dataTransfer.files&&e.dataTransfer.files[0])handleCampFile(e.dataTransfer.files[0]); });
+  }
+})();
 
 
 function showTab(t){
@@ -1528,7 +1524,7 @@ function showTab(t){
   document.getElementById('tabImport').classList.toggle('on',t==='import');
   document.getElementById('tabCamp').classList.toggle('on',t==='camp');
   if(t==='import')renderManage();
-  if(t==='camp'){ preencherCampSelect(); renderCampDetalhe(); }
+  if(t==='camp'){ renderMargens(); preencherCampSelect(); renderCampDetalhe(); }
 }
 document.getElementById('tabList').onclick=()=>showTab('list');
 document.getElementById('tabImport').onclick=()=>{ if(pedirSenha()) showTab('import'); };
@@ -1566,6 +1562,7 @@ function init(){
       const ok=await carregarDoBanco();
       if(ok){ buildStats();buildFilters();render();renderManage(); }
       await carregarCampanhas();
+      renderMargens();
       preencherCampSelect();
     }catch(e){ if(window.console)console.warn('sync init:',e); }
   })();
