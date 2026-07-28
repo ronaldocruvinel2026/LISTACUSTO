@@ -173,12 +173,9 @@ footer{border-top:1px solid var(--line);padding:20px 0;text-align:center;font-si
   .season{text-align:left}
   .brand h1{font-size:18px}
   .tab{padding:10px 13px;font-size:13px}
-  table.mtable{font-size:12.5px;min-width:0}
-  table.mtable tbody td,table.mtable thead th{padding:8px 7px}
+  table.mtable{font-size:12.5px}
+  table.mtable tbody td,table.mtable thead th{padding:8px 9px}
   .hide-sm{display:none}
-  /* na aba Campanhas, esconder Fabricante no celular p/ caber Produto+Custo+Preço */
-  #campBody .m-fab,.camp-col-fab{display:none}
-  .camp-custo,.camp-preco{font-size:12px}
 }
 /* ===== Campanhas ===== */
 .camp-topo{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
@@ -212,6 +209,8 @@ footer{border-top:1px solid var(--line);padding:20px 0;text-align:center;font-si
 .grp-marg-del{background:none;border:0;color:var(--danger);font-size:15px;cursor:pointer;padding:2px 6px;border-radius:6px;opacity:.7}
 .grp-marg-del:hover{opacity:1;background:var(--danger-soft)}
 .camp-tag-man{display:inline-block;margin-left:6px;font-size:9.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--gold);background:var(--gold-soft);border:1px solid #e8d8b0;border-radius:5px;padding:1px 5px;vertical-align:middle}
+.camp-scroll-dica{display:none;font-size:11.5px;color:var(--muted);font-weight:600;text-align:center;padding:6px 0;background:var(--gold-soft);border-radius:8px;margin-bottom:6px}
+@media(max-width:640px){ .camp-scroll-dica{display:block} }
 </style>
 </head>
 <body>
@@ -683,10 +682,11 @@ global.XLSX=XLSX;
             <input id="campVerBusca" type="text" placeholder="Filtrar produtos da campanha...">
           </div>
         </div>
+        <div class="camp-scroll-dica">← arraste para o lado para ver custo e preço →</div>
         <div class="mtable-wrap">
           <table class="mtable">
             <thead><tr>
-              <th class="camp-col-fab">Fabricante</th><th>Produto</th><th class="hide-sm">Grupo</th><th class="hide-sm">Venc.</th>
+              <th class="camp-col-fab">Fabricante</th><th>Produto</th><th>Grupo</th><th>Venc.</th>
               <th style="text-align:right">Custo</th><th style="text-align:right">Preço venda</th>
             </tr></thead>
             <tbody id="campBody"></tbody>
@@ -1419,8 +1419,8 @@ function renderCampDetalhe(){
       return '<tr>'+
         '<td class="m-fab">'+esc(it.fab||'—')+'</td>'+
         '<td class="t-name">'+esc(it.prod||'—')+'</td>'+
-        '<td class="t-ia hide-sm">'+esc(normGrupo(it.grupo)||'—')+'</td>'+
-        '<td class="t-venc hide-sm">'+(it.venc?esc(it.venc):'—')+'</td>'+
+        '<td class="t-ia">'+esc(normGrupo(it.grupo)||'—')+'</td>'+
+        '<td class="t-venc">'+(it.venc?esc(it.venc):'—')+'</td>'+
         '<td class="camp-custo">'+(it.custo!=null?('R$ '+fmtBRL(it.custo)):'—')+'</td>'+
         '<td class="camp-preco">'+(pv!=null?('R$ '+fmtBRL(pv)+(manual?'<span class="camp-tag-man">fixo</span>':'')):'—')+'</td>'+
       '</tr>';
