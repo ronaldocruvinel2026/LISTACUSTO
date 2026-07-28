@@ -173,9 +173,12 @@ footer{border-top:1px solid var(--line);padding:20px 0;text-align:center;font-si
   .season{text-align:left}
   .brand h1{font-size:18px}
   .tab{padding:10px 13px;font-size:13px}
-  table.mtable{font-size:12.5px}
-  table.mtable tbody td,table.mtable thead th{padding:8px 9px}
+  table.mtable{font-size:12.5px;min-width:0}
+  table.mtable tbody td,table.mtable thead th{padding:8px 7px}
   .hide-sm{display:none}
+  /* na aba Campanhas, esconder Fabricante no celular p/ caber Produto+Custo+Preço */
+  #campBody .m-fab,.camp-col-fab{display:none}
+  .camp-custo,.camp-preco{font-size:12px}
 }
 /* ===== Campanhas ===== */
 .camp-topo{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
@@ -683,7 +686,7 @@ global.XLSX=XLSX;
         <div class="mtable-wrap">
           <table class="mtable">
             <thead><tr>
-              <th>Fabricante</th><th>Produto</th><th class="hide-sm">Grupo</th><th class="hide-sm">Venc.</th>
+              <th class="camp-col-fab">Fabricante</th><th>Produto</th><th class="hide-sm">Grupo</th><th class="hide-sm">Venc.</th>
               <th style="text-align:right">Custo</th><th style="text-align:right">Preço venda</th>
             </tr></thead>
             <tbody id="campBody"></tbody>
