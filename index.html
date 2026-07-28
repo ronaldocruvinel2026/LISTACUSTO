@@ -208,6 +208,7 @@ footer{border-top:1px solid var(--line);padding:20px 0;text-align:center;font-si
 .grp-marg-div{font-size:11.5px;color:var(--muted);font-weight:600}
 .grp-marg-del{background:none;border:0;color:var(--danger);font-size:15px;cursor:pointer;padding:2px 6px;border-radius:6px;opacity:.7}
 .grp-marg-del:hover{opacity:1;background:var(--danger-soft)}
+.camp-tag-man{display:inline-block;margin-left:6px;font-size:9.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--gold);background:var(--gold-soft);border:1px solid #e8d8b0;border-radius:5px;padding:1px 5px;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -649,7 +650,7 @@ global.XLSX=XLSX;
       <div class="import-box" id="campDrop">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="m9 15 3-3 3 3"/></svg>
         <h3>Enviar planilha (.xlsx)</h3>
-        <p>Colunas: <b>CAMPANHA, FABRICANTE, PRODUTO, PRINCIPIO ATIVO (I.A), GRUPO, VENCIMENTO, UNIDADE, PREÇO</b>. O PREÇO é o custo. Reimportar <b>substitui</b> os dados das campanhas contidas na planilha.</p>
+        <p>Colunas: <b>CAMPANHA, FABRICANTE, PRODUTO, PRINCIPIO ATIVO (I.A), GRUPO, VENCIMENTO, UNIDADE, PREÇO, PREÇO DE VENDA</b>. O PREÇO é o custo. Se a coluna <b>PREÇO DE VENDA</b> estiver preenchida, esse valor é usado direto; se estiver em branco, o preço é calculado pela margem do grupo. Reimportar <b>substitui</b> os dados das campanhas contidas na planilha.</p>
         <button class="btn" id="campImportBtn">Escolher arquivo</button>
         <input type="file" id="campFile" accept=".xlsx,.xls" hidden>
       </div>
@@ -661,6 +662,7 @@ global.XLSX=XLSX;
       <h3 style="font-size:15px;font-weight:800;color:var(--leaf-dark);margin:0 0 10px">Conferir campanha</h3>
       <div class="camp-topo">
         <select id="campSel" class="camp-sel"><option value="">— selecione uma campanha —</option></select>
+        <button class="btn ghost" id="campReload">↻ Recarregar do banco</button>
         <button class="btn danger" id="campExcluir" disabled>Excluir campanha</button>
       </div>
       <div id="campVazio" class="mc-vazio" style="display:none">Nenhuma campanha ainda. Importe uma planilha para criar.</div>
@@ -1303,6 +1305,13 @@ function precoVenda(custo, grupo, venc){
   const base=custo/Math.pow(1+TAXA_MENSAL_CAMP,mesesAteVenc(venc));
   return base/(1-margem);
 }
+// preço final do item: usa o manual (preco_venda) se houver; senão calcula pela margem
+function precoFinal(it){
+  if(it.preco_venda!=null && it.preco_venda>0) return it.preco_venda;
+  return precoVenda(it.custo, it.grupo, it.venc);
+}
+// true se o preço veio digitado na planilha (manual)
+function precoEhManual(it){ return it.preco_venda!=null && it.preco_venda>0; }
 
 async function carregarCampanhas(){
   if(!sbReady) return;
@@ -1313,13 +1322,22 @@ async function carregarCampanhas(){
     if(margensGrupo['DEFENSIVO']==null) margensGrupo['DEFENSIVO']=0.20;
     if(margensGrupo['ESPECIALIDADE']==null) margensGrupo['ESPECIALIDADE']=0.30;
     const {data:camps}=await sb.from('campanhas').select('*').order('ordem',{ascending:true}).order('id',{ascending:true});
-    const {data:itens}=await sb.from('campanha_itens').select('*');
+    // buscar itens em páginas de 1000 (Supabase limita cada select a 1000 linhas)
+    let itens=[], desde=0, bloco=1000;
+    while(true){
+      const {data:parte,error}=await sb.from('campanha_itens').select('*').order('id',{ascending:true}).range(desde,desde+bloco-1);
+      if(error) throw error;
+      if(!parte||!parte.length) break;
+      itens=itens.concat(parte);
+      if(parte.length<bloco) break;
+      desde+=bloco;
+    }
     campanhas=(camps||[]).map(c=>({id:c.id,nome:c.nome,
-      itens:(itens||[]).filter(it=>it.campanha_id===c.id).map(it=>({
-        id:it.id, fab:it.fab||'', prod:it.prod||'', ia:it.ia||'', grupo:it.grupo||'', custo:it.custo, venc:it.vencimento||'', unid:it.unidade||'LT'
+      itens:itens.filter(it=>it.campanha_id===c.id).map(it=>({
+        id:it.id, fab:it.fab||'', prod:it.prod||'', ia:it.ia||'', grupo:it.grupo||'', custo:it.custo, venc:it.vencimento||'', unid:it.unidade||'LT', preco_venda:(it.preco_venda!=null?+it.preco_venda:null)
       }))
     }));
-  }catch(e){ if(window.console)console.warn('Erro campanhas:',e); }
+  }catch(e){ if(window.console)console.warn('Erro campanhas:',e); alert('Erro ao carregar campanhas: '+(e.message||e)); }
 }
 
 /* ---- margens por grupo ---- */
@@ -1393,14 +1411,15 @@ function renderCampDetalhe(){
   if(!itens.length){ body.innerHTML='<tr><td colspan="6" style="text-align:center;padding:26px;color:var(--muted)">Nenhum produto.</td></tr>'; }
   else{
     body.innerHTML=itens.map(it=>{
-      const pv=precoVenda(it.custo,it.grupo,it.venc);
+      const pv=precoFinal(it);
+      const manual=precoEhManual(it);
       return '<tr>'+
         '<td class="m-fab">'+esc(it.fab||'—')+'</td>'+
         '<td class="t-name">'+esc(it.prod||'—')+'</td>'+
         '<td class="t-ia hide-sm">'+esc(normGrupo(it.grupo)||'—')+'</td>'+
         '<td class="t-venc hide-sm">'+(it.venc?esc(it.venc):'—')+'</td>'+
         '<td class="camp-custo">'+(it.custo!=null?('R$ '+fmtBRL(it.custo)):'—')+'</td>'+
-        '<td class="camp-preco">'+(pv!=null?('R$ '+fmtBRL(pv)):'—')+'</td>'+
+        '<td class="camp-preco">'+(pv!=null?('R$ '+fmtBRL(pv)+(manual?'<span class="camp-tag-man">fixo</span>':'')):'—')+'</td>'+
       '</tr>';
     }).join('');
   }
@@ -1433,7 +1452,15 @@ function handleCampFile(file){
         const col=(alts)=>{ for(const a of alts){ let i=H.findIndex(h=>h===norm(a)); if(i<0)i=H.findIndex(h=>h.includes(norm(a))); if(i>=0)return i; } return -1; };
         const iCamp=col(['campanha']), iFab=col(['fabricante']), iProd=col(['produto']),
               iIa=col(['principio ativo','i.a','ingrediente']), iGrupo=col(['grupo']),
-              iVenc=col(['vencimento','venc']), iUnid=col(['unidade','unid']), iPreco=col(['preco','preço','custo','valor']);
+              iVenc=col(['vencimento','venc']), iUnid=col(['unidade','unid']);
+        // PREÇO DE VENDA (manual) primeiro, para não confundir com o custo
+        const iPrecoVenda=H.findIndex(h=>h.includes('venda'));
+        // custo = coluna PREÇO/CUSTO que NÃO seja a de venda
+        let iCusto=-1;
+        for(const a of ['custo','preco','preço','valor']){
+          const idx=H.findIndex((h,i)=>i!==iPrecoVenda && (h===norm(a)||h.includes(norm(a))));
+          if(idx>=0){ iCusto=idx; break; }
+        }
         if(iProd<0||iCamp<0) return;
         for(let r=1;r<rows.length;r++){
           const row=rows[r]; if(!row) continue;
@@ -1448,7 +1475,8 @@ function handleCampFile(file){
             grupo:iGrupo>=0?normGrupo(row[iGrupo]):'',
             venc:iVenc>=0?normalizaVenc(row[iVenc]):'',
             unid:iUnid>=0&&row[iUnid]!=null?String(row[iUnid]).trim().toUpperCase():'LT',
-            custo:iPreco>=0?parsePreco(row[iPreco]):null
+            custo:iCusto>=0?parsePreco(row[iCusto]):null,
+            preco_venda:iPrecoVenda>=0?parsePreco(row[iPrecoVenda]):null
           });
         }
       });
@@ -1481,15 +1509,15 @@ function handleCampFile(file){
         if(sbReady){ try{ await sb.from('campanha_itens').delete().eq('campanha_id',c.id); }catch(_){} }
         c.itens=[];
         // inserir novos
-        const payload=porCamp[nome].map(l=>({campanha_id:c.id, fab:l.fab, prod:l.prod, ia:l.ia, grupo:normGrupo(l.grupo), custo:l.custo, vencimento:l.venc||null, unidade:l.unid||'LT'}));
+        const payload=porCamp[nome].map(l=>({campanha_id:c.id, fab:l.fab, prod:l.prod, ia:l.ia, grupo:normGrupo(l.grupo), custo:l.custo, vencimento:l.venc||null, unidade:l.unid||'LT', preco_venda:(l.preco_venda!=null?l.preco_venda:null)}));
         if(sbReady){
           for(let i=0;i<payload.length;i+=200){
             const {data,error}=await sb.from('campanha_itens').insert(payload.slice(i,i+200)).select();
             if(error){ st.className='import-status err'; st.textContent='Erro ao salvar na nuvem: '+(error.message||error); return; }
-            (data||[]).forEach(row=>c.itens.push({id:row.id,fab:row.fab,prod:row.prod,ia:row.ia,grupo:row.grupo,custo:row.custo,venc:row.vencimento||'',unid:row.unidade||'LT'}));
+            (data||[]).forEach(row=>c.itens.push({id:row.id,fab:row.fab,prod:row.prod,ia:row.ia,grupo:row.grupo,custo:row.custo,venc:row.vencimento||'',unid:row.unidade||'LT',preco_venda:(row.preco_venda!=null?+row.preco_venda:null)}));
           }
         } else {
-          payload.forEach(p=>c.itens.push({id:Date.now()+Math.random(),fab:p.fab,prod:p.prod,ia:p.ia,grupo:p.grupo,custo:p.custo,venc:p.vencimento||'',unid:p.unidade}));
+          payload.forEach(p=>c.itens.push({id:Date.now()+Math.random(),fab:p.fab,prod:p.prod,ia:p.ia,grupo:p.grupo,custo:p.custo,venc:p.vencimento||'',unid:p.unidade,preco_venda:p.preco_venda}));
         }
       }
       renderMargens(); preencherCampSelect(); renderCampDetalhe();
@@ -1503,6 +1531,11 @@ function handleCampFile(file){
 document.getElementById('grpAddBtn').onclick=adicionarGrupo;
 document.getElementById('campSel').onchange=function(e){ campAtualId=e.target.value?(+e.target.value):null; if(document.getElementById('campVerBusca'))document.getElementById('campVerBusca').value=''; renderCampDetalhe(); };
 document.getElementById('campExcluir').onclick=excluirCampanha;
+document.getElementById('campReload').onclick=async function(){
+  const b=this; b.disabled=true; const txt=b.textContent; b.textContent='Recarregando...';
+  try{ await carregarCampanhas(); renderMargens(); preencherCampSelect(); renderCampDetalhe(); }
+  finally{ b.disabled=false; b.textContent=txt; }
+};
 document.getElementById('campVerBusca').oninput=renderCampDetalhe;
 document.getElementById('campImportBtn').onclick=()=>document.getElementById('campFile').click();
 document.getElementById('campFile').onchange=e=>{ if(e.target.files&&e.target.files[0]){ handleCampFile(e.target.files[0]); e.target.value=''; } };
