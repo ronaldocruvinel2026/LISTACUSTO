@@ -1486,7 +1486,23 @@ function handleCampFile(file){
       const porCamp={};
       linhas.forEach(l=>{ (porCamp[l.campanha]=porCamp[l.campanha]||[]).push(l); });
       const nomes=Object.keys(porCamp);
+
+      // confirmação: esta importação apaga TUDO e recria do zero
+      if(campanhas.length){
+        if(!confirm('Esta importação vai APAGAR todas as campanhas atuais ('+campanhas.length+') e recriar apenas o que está na planilha. Deseja continuar?')){
+          st.className='import-status'; st.textContent=''; return;
+        }
+      }
       st.className='import-status ok'; st.textContent='Importando '+linhas.length+' linha(s) em '+nomes.length+' campanha(s)...';
+
+      // APAGAR TUDO do banco (itens e campanhas) antes de recriar
+      if(sbReady){
+        try{
+          await sb.from('campanha_itens').delete().not('id','is',null);
+          await sb.from('campanhas').delete().not('id','is',null);
+        }catch(e){ st.className='import-status err'; st.textContent='Erro ao limpar campanhas antigas: '+(e.message||e); return; }
+      }
+      campanhas=[];
 
       // garantir que os grupos da planilha existam nas margens (senão cria com 20%)
       const gruposNovos=[...new Set(linhas.map(l=>normGrupo(l.grupo)).filter(Boolean))];
@@ -1498,17 +1514,11 @@ function handleCampFile(file){
       }
 
       for(const nome of nomes){
-        // achar ou criar campanha
-        let c=campanhas.find(x=>norm(x.nome)===norm(nome));
-        if(!c){
-          let novoId=Date.now()+Math.floor(Math.random()*1000);
-          if(sbReady){ try{ const {data}=await sb.from('campanhas').insert([{nome:nome,ativa:true,ordem:campanhas.length}]).select(); if(data&&data[0])novoId=data[0].id; }catch(err){} }
-          c={id:novoId,nome:nome,itens:[]}; campanhas.push(c);
-        }
-        // SUBSTITUI: apagar itens antigos da campanha
-        if(sbReady){ try{ await sb.from('campanha_itens').delete().eq('campanha_id',c.id); }catch(_){} }
-        c.itens=[];
-        // inserir novos
+        // criar campanha (tudo foi apagado, então sempre cria nova)
+        let novoId=Date.now()+Math.floor(Math.random()*1000);
+        if(sbReady){ try{ const {data}=await sb.from('campanhas').insert([{nome:nome,ativa:true,ordem:campanhas.length}]).select(); if(data&&data[0])novoId=data[0].id; }catch(err){} }
+        let c={id:novoId,nome:nome,itens:[]}; campanhas.push(c);
+        // inserir itens
         const payload=porCamp[nome].map(l=>({campanha_id:c.id, fab:l.fab, prod:l.prod, ia:l.ia, grupo:normGrupo(l.grupo), custo:l.custo, vencimento:l.venc||null, unidade:l.unid||'LT', preco_venda:(l.preco_venda!=null?l.preco_venda:null)}));
         if(sbReady){
           for(let i=0;i<payload.length;i+=200){
@@ -1520,8 +1530,10 @@ function handleCampFile(file){
           payload.forEach(p=>c.itens.push({id:Date.now()+Math.random(),fab:p.fab,prod:p.prod,ia:p.ia,grupo:p.grupo,custo:p.custo,venc:p.vencimento||'',unid:p.unidade,preco_venda:p.preco_venda}));
         }
       }
+      campAtualId=null;
+      const selEl=document.getElementById('campSel'); if(selEl) selEl.value='';
       renderMargens(); preencherCampSelect(); renderCampDetalhe();
-      st.className='import-status ok'; st.textContent='✓ Importado: '+linhas.length+' produto(s) em '+nomes.length+' campanha(s) ('+nomes.join(', ')+').';
+      st.className='import-status ok'; st.textContent='✓ Importado: '+linhas.length+' produto(s) em '+nomes.length+' campanha(s) ('+nomes.join(', ')+'). Campanhas antigas removidas.';
     }catch(err){ st.className='import-status err'; st.textContent='Erro ao ler a planilha: '+(err&&err.message?err.message:err); }
   };
   reader.readAsArrayBuffer(file);
