@@ -634,7 +634,7 @@ global.XLSX=XLSX;
       <!-- MARGENS POR GRUPO -->
       <h3 style="font-size:15px;font-weight:800;color:var(--leaf-dark);margin:0 0 10px">Margem por grupo</h3>
       <div class="import-note" style="margin-top:0;margin-bottom:12px">
-        A margem é definida <b>por grupo</b> (DEFENSIVO, ESPECIALIDADE, ou outros que criar) e vale igual em todas as campanhas. O preço de venda é <b>[custo ÷ (1,01)^meses até vencimento] ÷ (1 − margem do grupo)</b>. O "PREÇO" da planilha é lido como <b>custo</b>.
+        A margem é definida <b>por grupo</b> (DEFENSIVO, ESPECIALIDADE, ou outros que criar) e vale igual em todas as campanhas. O preço de venda é <b>custo ÷ (1 − margem do grupo)</b> — o preço no vencimento da tabela. Ex.: margem 20% = custo ÷ 0,80. A taxa de 1% ao mês (antecipar ou postergar o vencimento) é aplicada na cotação. O "PREÇO" da planilha é lido como <b>custo</b>.
       </div>
       <div id="grpMargList" class="grp-marg-list"></div>
       <div class="camp-topo" style="margin-top:10px">
@@ -1302,8 +1302,8 @@ function precoVenda(custo, grupo, venc){
   if(custo==null||custo<=0) return null;
   const margem=margemDoGrupo(grupo);
   if(margem>=1) return null;
-  const base=custo/Math.pow(1+TAXA_MENSAL_CAMP,mesesAteVenc(venc));
-  return base/(1-margem);
+  // preço no vencimento da tabela = custo ÷ (1 − margem). A taxa de 1%/mês é aplicada na cotação (Etapa 2).
+  return custo/(1-margem);
 }
 // preço final do item: usa o manual (preco_venda) se houver; senão calcula pela margem
 function precoFinal(it){
