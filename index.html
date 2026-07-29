@@ -1456,19 +1456,14 @@ function handleCampFile(file){
         const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:null});
         if(!rows||!rows.length) return;
         const H=rows[0].map(x=>norm(x==null?'':String(x)));
-        const col=(alts)=>{ for(const a of alts){ let i=H.findIndex(h=>h===norm(a)); if(i<0)i=H.findIndex(h=>h.includes(norm(a))); if(i>=0)return i; } return -1; };
-        const iCamp=col(['campanha']), iFab=col(['fabricante']), iProd=col(['produto']),
-              iIa=col(['principio ativo','i.a','ingrediente']), iGrupo=col(['grupo']),
-              iVenc=col(['vencimento','venc']), iUnid=col(['unidade','unid']);
-        // PREÇO DE VENDA (manual) primeiro, para não confundir com o custo
-        const iPrecoVenda=H.findIndex(h=>h.includes('venda'));
-        // custo = coluna PREÇO/CUSTO que NÃO seja a de venda
-        let iCusto=-1;
-        for(const a of ['custo','preco','preço','valor']){
-          const idx=H.findIndex((h,i)=>i!==iPrecoVenda && (h===norm(a)||h.includes(norm(a))));
-          if(idx>=0){ iCusto=idx; break; }
-        }
-        if(iProd<0||iCamp<0) return;
+        // localizador EXATO: casa o cabeçalho inteiro (evita pegar coluna-fantasma sem título)
+        const colExata=(nomes)=>{ for(const n of nomes){ const i=H.findIndex(h=>h===norm(n)); if(i>=0)return i; } return -1; };
+        const iCamp=colExata(['campanha']), iFab=colExata(['fabricante']), iProd=colExata(['produto']),
+              iIa=colExata(['principio ativo (i.a)','principio ativo','i.a','ingrediente']), iGrupo=colExata(['grupo']),
+              iVenc=colExata(['vencimento']), iUnid=colExata(['unidade']),
+              iCusto=colExata(['preco','custo']),
+              iPrecoVenda=colExata(['preco de venda','preço de venda','preco venda']);
+        if(iProd<0||iCamp<0){ st.className='import-status err'; st.textContent='Cabeçalho não reconhecido. A primeira linha precisa ter as colunas CAMPANHA e PRODUTO exatamente com esses nomes.'; return; }
         for(let r=1;r<rows.length;r++){
           const row=rows[r]; if(!row) continue;
           const camp=iCamp>=0&&row[iCamp]!=null?String(row[iCamp]).trim():'';
