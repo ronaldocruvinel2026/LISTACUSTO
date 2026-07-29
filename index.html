@@ -8,7 +8,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Setec Agro — Lista de Preços Defensivos 26/27</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<!-- leitor de planilha removido: versão offline sem importação -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- SheetJS oficial acima; o mini-leitor embutido fica só como reserva offline -->
 <style>
 :root{
   --ink:#12211a; --paper:#f6f4ec; --card:#ffffff;
@@ -221,7 +222,7 @@ footer{border-top:1px solid var(--line);padding:20px 0;text-align:center;font-si
 <body>
 <script>
 /* ===== Controle de versão / auto-atualização (anti-cache) ===== */
-window.APP_VERSION="20260729112546";
+window.APP_VERSION="20260729113202";
 (function(){
   function checarAtualizacao(){
     try{
@@ -520,7 +521,7 @@ var XLSX={
   }
 };
 
-global.XLSX=XLSX;
+if(!global.XLSX){ global.XLSX=XLSX; } /* só usa o mini-leitor se a SheetJS oficial (CDN) não carregou */
 })(typeof window!=='undefined'?window:this);
 
 }catch(_e){ if(window.console)console.warn("XLSX indisponível:",_e); }
@@ -1467,7 +1468,7 @@ async function excluirCampanha(){
 function handleCampFile(file){
   if(!file) return;
   const st=document.getElementById('campImportStatus');
-  st.className='import-status'; st.textContent='';
+  st.className='import-status ok'; st.textContent='Lendo o arquivo...';
   if(typeof XLSX==='undefined'||!XLSX.read){ st.className='import-status err'; st.textContent='Leitor de planilha indisponível.'; return; }
   const reader=new FileReader();
   reader.onload=async function(e){
@@ -1555,7 +1556,8 @@ function handleCampFile(file){
       campAtualId=null;
       const selEl=document.getElementById('campSel'); if(selEl) selEl.value='';
       renderMargens(); preencherCampSelect(); renderCampDetalhe();
-      let msg='✓ Importado: '+linhas.length+' produto(s) em '+nomes.length+' campanha(s) ('+nomes.join(', ')+'). Campanhas antigas removidas.';
+      const nFixos=linhas.filter(l=>l.preco_venda!=null&&l.preco_venda>0).length;
+      let msg='✓ Importado: '+linhas.length+' produto(s) em '+nomes.length+' campanha(s) ('+nomes.join(', ')+'). Preços fixos lidos: '+nFixos+'. Campanhas antigas removidas.';
       if(gruposRecemCriados.length){ msg+=' ⚠ Grupo(s) novo(s) detectado(s): '+gruposRecemCriados.join(', ')+' — role até "Margem por grupo" e defina a margem (entraram com 20% provisório).'; }
       st.className='import-status ok'; st.textContent=msg;
     }catch(err){ st.className='import-status err'; st.textContent='Erro ao ler a planilha: '+(err&&err.message?err.message:err); }
