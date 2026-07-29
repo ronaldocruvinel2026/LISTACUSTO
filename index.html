@@ -1455,9 +1455,10 @@ function handleCampFile(file){
       wb.SheetNames.forEach(function(sn){
         const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:null});
         if(!rows||!rows.length) return;
-        const H=rows[0].map(x=>norm(x==null?'':String(x)));
-        // localizador EXATO: casa o cabeçalho inteiro (evita pegar coluna-fantasma sem título)
-        const colExata=(nomes)=>{ for(const n of nomes){ const i=H.findIndex(h=>h===norm(n)); if(i>=0)return i; } return -1; };
+        const H=rows[0].map(x=>norm(x==null?'':String(x)).trim());
+        // localizador EXATO (com trim): casa o cabeçalho inteiro, ignorando espaços nas pontas.
+        // Assim "PRODUTO " casa com "produto", mas coluna sem título ('') não casa com nada.
+        const colExata=(nomes)=>{ for(const n of nomes){ const alvo=norm(n).trim(); const i=H.findIndex(h=>h===alvo); if(i>=0)return i; } return -1; };
         const iCamp=colExata(['campanha']), iFab=colExata(['fabricante']), iProd=colExata(['produto']),
               iIa=colExata(['principio ativo (i.a)','principio ativo','i.a','ingrediente']), iGrupo=colExata(['grupo']),
               iVenc=colExata(['vencimento']), iUnid=colExata(['unidade']),
