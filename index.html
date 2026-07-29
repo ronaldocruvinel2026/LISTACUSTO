@@ -187,6 +187,13 @@ footer{border-top:1px solid var(--line);padding:20px 0;text-align:center;font-si
 .camp-sel:focus{border-color:var(--leaf)}
 .camp-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;background:var(--leaf-soft);border:1px solid #b6d4c1;border-radius:14px;padding:14px 18px;margin-bottom:16px}
 .camp-head-nome{font-size:19px;font-weight:800;color:var(--leaf-dark)}
+.camp-vencmax{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--gold-soft);border:1px solid #e8d8b0;border-radius:12px;padding:12px 14px;margin-bottom:14px}
+.camp-vencmax label{font-size:13px;font-weight:700;color:#8a6d1f}
+.camp-vencmax input{width:170px;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;font-size:14px;font-weight:700;outline:none;font-family:inherit}
+.camp-vencmax input:focus{border-color:var(--leaf)}
+.camp-vencmax-msg{font-size:12.5px;font-weight:700}
+.camp-vencmax-msg.ok{color:var(--leaf-dark)}
+.camp-vencmax-msg.err{color:var(--danger)}
 .camp-head-marg{font-size:13px;font-weight:700;color:var(--gold);margin-top:2px}
 .camp-head-stat{font-size:13px;font-weight:700;color:var(--muted);background:#fff;border-radius:20px;padding:7px 15px}
 .camp-addbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:6px}
@@ -222,7 +229,7 @@ footer{border-top:1px solid var(--line);padding:20px 0;text-align:center;font-si
 <body>
 <script>
 /* ===== Controle de versão / auto-atualização (anti-cache) ===== */
-window.APP_VERSION="20260729113202";
+window.APP_VERSION="20260729191134";
 (function(){
   function checarAtualizacao(){
     try{
@@ -701,6 +708,12 @@ if(!global.XLSX){ global.XLSX=XLSX; } /* só usa o mini-leitor se a SheetJS ofic
             <div class="camp-head-nome" id="campNome">—</div>
           </div>
           <div class="camp-head-stat" id="campStat">0 produtos</div>
+        </div>
+        <div class="camp-vencmax">
+          <label for="campVencMax">Vencimento máximo desta campanha (limita o prazo na cotação):</label>
+          <input id="campVencMax" type="text" placeholder="dd/mm/aaaa (ex: 30/04/2027)" maxlength="10">
+          <button class="btn" id="campVencMaxSalvar">Salvar</button>
+          <span id="campVencMaxMsg" class="camp-vencmax-msg"></span>
         </div>
         <div class="camp-addbar" style="margin-bottom:10px">
           <div class="search" style="flex:1;min-width:200px">
@@ -1362,7 +1375,7 @@ async function carregarCampanhas(){
       if(parte.length<bloco) break;
       desde+=bloco;
     }
-    campanhas=(camps||[]).map(c=>({id:c.id,nome:c.nome,
+    campanhas=(camps||[]).map(c=>({id:c.id,nome:c.nome,venc_max:c.venc_max||'',
       itens:itens.filter(it=>it.campanha_id===c.id).map(it=>({
         id:it.id, fab:it.fab||'', prod:it.prod||'', ia:it.ia||'', grupo:it.grupo||'', custo:it.custo, venc:it.vencimento||'', unid:it.unidade||'LT', preco_venda:(it.preco_venda!=null?+it.preco_venda:null)
       }))
@@ -1433,6 +1446,8 @@ function renderCampDetalhe(){
   if(!c){ det.style.display='none'; return; }
   det.style.display='block';
   document.getElementById('campNome').textContent=c.nome;
+  const vm=document.getElementById('campVencMax'); if(vm) vm.value=c.venc_max||'';
+  const vmsg=document.getElementById('campVencMaxMsg'); if(vmsg){ vmsg.textContent=''; vmsg.className='camp-vencmax-msg'; }
   document.getElementById('campStat').textContent=c.itens.length+' produto'+(c.itens.length===1?'':'s');
   const q=norm(document.getElementById('campVerBusca')?document.getElementById('campVerBusca').value:'');
   let itens=c.itens.slice();
@@ -1569,6 +1584,31 @@ function handleCampFile(file){
 document.getElementById('grpAddBtn').onclick=adicionarGrupo;
 document.getElementById('campSel').onchange=function(e){ campAtualId=e.target.value?(+e.target.value):null; if(document.getElementById('campVerBusca'))document.getElementById('campVerBusca').value=''; renderCampDetalhe(); };
 document.getElementById('campExcluir').onclick=excluirCampanha;
+// salvar vencimento máximo da campanha
+(function(){
+  const btn=document.getElementById('campVencMaxSalvar');
+  if(!btn) return;
+  btn.onclick=async function(){
+    const c=campSelecionada();
+    const msg=document.getElementById('campVencMaxMsg');
+    if(!c){ return; }
+    let v=(document.getElementById('campVencMax').value||'').trim();
+    // validar formato dd/mm/aaaa (ou vazio para limpar)
+    if(v!==''){
+      const m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(v);
+      if(!m){ msg.className='camp-vencmax-msg err'; msg.textContent='Use o formato dd/mm/aaaa.'; return; }
+      // normaliza com zero à esquerda
+      v=String(+m[1]).padStart(2,'0')+'/'+String(+m[2]).padStart(2,'0')+'/'+m[3];
+    }
+    if(sbReady){
+      try{ await sb.from('campanhas').update({venc_max:v||null}).eq('id',c.id); }
+      catch(e){ msg.className='camp-vencmax-msg err'; msg.textContent='Erro ao salvar: '+(e.message||e); return; }
+    }
+    c.venc_max=v;
+    document.getElementById('campVencMax').value=v;
+    msg.className='camp-vencmax-msg ok'; msg.textContent='✓ Vencimento máximo salvo.';
+  };
+})();
 document.getElementById('campReload').onclick=async function(){
   const b=this; b.disabled=true; const txt=b.textContent; b.textContent='Recarregando...';
   try{ await carregarCampanhas(); renderMargens(); preencherCampSelect(); renderCampDetalhe(); }
