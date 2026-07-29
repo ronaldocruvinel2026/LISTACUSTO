@@ -221,7 +221,7 @@ footer{border-top:1px solid var(--line);padding:20px 0;text-align:center;font-si
 <body>
 <script>
 /* ===== Controle de versão / auto-atualização (anti-cache) ===== */
-window.APP_VERSION="20260729111216";
+window.APP_VERSION="20260729112546";
 (function(){
   function checarAtualizacao(){
     try{
@@ -1513,13 +1513,7 @@ function handleCampFile(file){
       linhas.forEach(l=>{ (porCamp[l.campanha]=porCamp[l.campanha]||[]).push(l); });
       const nomes=Object.keys(porCamp);
 
-      // confirmação: esta importação apaga TUDO e recria do zero
-      if(campanhas.length){
-        if(!confirm('Esta importação vai APAGAR todas as campanhas atuais ('+campanhas.length+') e recriar apenas o que está na planilha. Deseja continuar?')){
-          st.className='import-status'; st.textContent=''; return;
-        }
-      }
-      st.className='import-status ok'; st.textContent='Importando '+linhas.length+' linha(s) em '+nomes.length+' campanha(s)...';
+      st.className='import-status ok'; st.textContent='Importando '+linhas.length+' linha(s) em '+nomes.length+' campanha(s)... (substituindo campanhas anteriores)';
 
       // APAGAR TUDO do banco (itens e campanhas) antes de recriar
       if(sbReady){
