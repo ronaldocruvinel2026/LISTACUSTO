@@ -229,7 +229,7 @@ footer{border-top:1px solid var(--line);padding:20px 0;text-align:center;font-si
 <body>
 <script>
 /* ===== Controle de versão / auto-atualização (anti-cache) ===== */
-window.APP_VERSION="20260729191134";
+window.APP_VERSION="20260729222457";
 (function(){
   function checarAtualizacao(){
     try{
@@ -685,7 +685,7 @@ if(!global.XLSX){ global.XLSX=XLSX; } /* só usa o mini-leitor se a SheetJS ofic
       <div class="import-box" id="campDrop">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="m9 15 3-3 3 3"/></svg>
         <h3>Enviar planilha (.xlsx)</h3>
-        <p>Colunas: <b>CAMPANHA, FABRICANTE, PRODUTO, PRINCIPIO ATIVO (I.A), GRUPO, VENCIMENTO, UNIDADE, PREÇO, PREÇO DE VENDA</b>. O PREÇO é o custo. Se a coluna <b>PREÇO DE VENDA</b> estiver preenchida, esse valor é usado direto; se estiver em branco, o preço é calculado pela margem do grupo. Reimportar <b>substitui</b> os dados das campanhas contidas na planilha.</p>
+        <p>Colunas: <b>CAMPANHA, FABRICANTE, PRODUTO, PRINCIPIO ATIVO (I.A), GRUPO, VENCIMENTO, UNIDADE, PREÇO, PREÇO DE VENDA, PRAZO DE PAGAMENTO MAXIMO</b>. O PREÇO é o custo. Se <b>PREÇO DE VENDA</b> estiver preenchida, esse valor é usado direto; senão, calcula pela margem do grupo. <b>PRAZO DE PAGAMENTO MAXIMO</b> (dd/mm/aaaa) define o venc. máximo da campanha e limita o prazo na cotação — repita a mesma data nas linhas da campanha. Reimportar <b>substitui</b> os dados das campanhas contidas na planilha.</p>
         <button class="btn" id="campImportBtn">Escolher arquivo</button>
         <input type="file" id="campFile" accept=".xlsx,.xls" hidden>
       </div>
@@ -1502,7 +1502,8 @@ function handleCampFile(file){
               iIa=colExata(['principio ativo (i.a)','principio ativo','i.a','ingrediente']), iGrupo=colExata(['grupo']),
               iVenc=colExata(['vencimento']), iUnid=colExata(['unidade']),
               iCusto=colExata(['preco','custo']),
-              iPrecoVenda=colExata(['preco de venda','preço de venda','preco venda']);
+              iPrecoVenda=colExata(['preco de venda','preço de venda','preco venda']),
+              iPrazoMax=colExata(['prazo de pagamento maximo','prazo de pagamento máximo','prazo pagamento maximo','prazo maximo','vencimento maximo','venc maximo']);
         if(iProd<0||iCamp<0){ st.className='import-status err'; st.textContent='Cabeçalho não reconhecido. A primeira linha precisa ter as colunas CAMPANHA e PRODUTO exatamente com esses nomes.'; return; }
         for(let r=1;r<rows.length;r++){
           const row=rows[r]; if(!row) continue;
@@ -1518,7 +1519,8 @@ function handleCampFile(file){
             venc:iVenc>=0?normalizaVenc(row[iVenc]):'',
             unid:iUnid>=0&&row[iUnid]!=null?String(row[iUnid]).trim().toUpperCase():'LT',
             custo:iCusto>=0?parsePreco(row[iCusto]):null,
-            preco_venda:iPrecoVenda>=0?parsePreco(row[iPrecoVenda]):null
+            preco_venda:iPrecoVenda>=0?parsePreco(row[iPrecoVenda]):null,
+            prazo_max:iPrazoMax>=0?normalizaVenc(row[iPrazoMax]):''
           });
         }
       });
@@ -1552,10 +1554,12 @@ function handleCampFile(file){
       }
 
       for(const nome of nomes){
+        // prazo máximo: pega da primeira linha da campanha que tiver preenchido
+        const prazoMax=(porCamp[nome].find(l=>l.prazo_max)||{}).prazo_max||'';
         // criar campanha (tudo foi apagado, então sempre cria nova)
         let novoId=Date.now()+Math.floor(Math.random()*1000);
-        if(sbReady){ try{ const {data}=await sb.from('campanhas').insert([{nome:nome,ativa:true,ordem:campanhas.length}]).select(); if(data&&data[0])novoId=data[0].id; }catch(err){} }
-        let c={id:novoId,nome:nome,itens:[]}; campanhas.push(c);
+        if(sbReady){ try{ const {data}=await sb.from('campanhas').insert([{nome:nome,ativa:true,ordem:campanhas.length,venc_max:prazoMax||null}]).select(); if(data&&data[0])novoId=data[0].id; }catch(err){} }
+        let c={id:novoId,nome:nome,venc_max:prazoMax,itens:[]}; campanhas.push(c);
         // inserir itens
         const payload=porCamp[nome].map(l=>({campanha_id:c.id, fab:l.fab, prod:l.prod, ia:l.ia, grupo:normGrupo(l.grupo), custo:l.custo, vencimento:l.venc||null, unidade:l.unid||'LT', preco_venda:(l.preco_venda!=null?l.preco_venda:null)}));
         if(sbReady){
